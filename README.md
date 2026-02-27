@@ -69,13 +69,23 @@ https://github.com/sanghoonleeeins/Fig2_WM_WGS_VAF_SBS
 
 https://github.com/sanghoonleeeins/Fig3_WM_WGS_CNA
 
+<img width="677" height="433" alt="image" src="https://github.com/user-attachments/assets/b09f10e0-21b8-4908-9b5f-e6f1526aba75" />
+
+
 ### Figure 4. Clonal architecture and evolutionary trajectories with WM driver mutation genes and chr1q gain or chr6q loss
 
 https://github.com/sanghoonleeeins/Fig4_WM_WGS_Phylogeny
 
+
 ### Figure 5. Genomic landscape of SVs in peripheral B cell lymphoma and WM subtypes
 
 https://github.com/sanghoonleeeins/Fig5_WM_WGS_StructuralVariant
+
+<img width="675" height="625" alt="image" src="https://github.com/user-attachments/assets/cc8e0092-54b2-4d72-9aa6-5e4e0d08e40b" />
+
+### Figure 6. 
+
+<img width="752" height="251" alt="image" src="https://github.com/user-attachments/assets/b5782522-b8da-4a74-94f7-6babcd91703d" />
 
 ------------------------------------------------------------------------
 
