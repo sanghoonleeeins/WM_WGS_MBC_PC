@@ -54,7 +54,9 @@ Find "Fig1_WM_WGS_SomaticMutation.qmd" file at
 
 https://github.com/sanghoonleeeins/WM_WGS_MBC_PC/tree/main/Figure1_SummarySomaticMutation
 
-<img width="560" height="399" alt="image" src="https://github.com/user-attachments/assets/58a22b47-a1d2-4da1-b138-9cea55198d0d" />
+Download all files in the link to your local computer, and open "Fig1_WM_WGS_SomaticMutation.qmd" in your RStudio
+
+<img width="760" height="599" alt="image" src="https://github.com/user-attachments/assets/58a22b47-a1d2-4da1-b138-9cea55198d0d" />
 
 ### Figure 2. Variant allele frequency (VAF) and single base substitution (SBS) signature
 
