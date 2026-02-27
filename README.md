@@ -81,11 +81,11 @@ https://github.com/sanghoonleeeins/Fig4_WM_WGS_Phylogeny
 
 https://github.com/sanghoonleeeins/Fig5_WM_WGS_StructuralVariant
 
-<img width="675" height="625" alt="image" src="https://github.com/user-attachments/assets/cc8e0092-54b2-4d72-9aa6-5e4e0d08e40b" />
+<img width="725" height="675" alt="image" src="https://github.com/user-attachments/assets/cc8e0092-54b2-4d72-9aa6-5e4e0d08e40b" />
 
 ### Figure 6. 
 
-<img width="752" height="251" alt="image" src="https://github.com/user-attachments/assets/b5782522-b8da-4a74-94f7-6babcd91703d" />
+<img width="700" height="221" alt="image" src="https://github.com/user-attachments/assets/b5782522-b8da-4a74-94f7-6babcd91703d" />
 
 ------------------------------------------------------------------------
 
