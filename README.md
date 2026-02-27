@@ -62,6 +62,9 @@ Find "Fig1_WM_WGS_SomaticMutation.qmd" file and open it on your RStudio.
 
 https://github.com/sanghoonleeeins/Fig2_WM_WGS_VAF_SBS
 
+<img width="723" height="587" alt="image" src="https://github.com/user-attachments/assets/5ab311a5-fb4d-44a4-81a1-aed675a8f098" />
+
+
 ### Figure 3. Copy number abnormality profiles.
 
 https://github.com/sanghoonleeeins/Fig3_WM_WGS_CNA
