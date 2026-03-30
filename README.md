@@ -20,8 +20,6 @@ Sanghoon Lee\*, Patrick Blaney\* , Dylan C. Gagler, Di Zhang, Lisa Cervia, Tom G
 
 ## Introduction
 
-\[Add screenshot here\]
-
 <img width="727" height="577" alt="image" src="https://github.com/user-attachments/assets/f0b76116-cccc-47ac-a70e-b9cdd931ec97" />
 
 **Visiaul Abstract** The direction of Waldenström Macroglobulinemia whole genome sequencing (WGS) data analysis\]
@@ -71,7 +69,7 @@ https://github.com/sanghoonleeeins/Figure2_VAF_SBSsignature
 
 https://github.com/sanghoonleeeins/Figure3_CopyNumberAbnormality
 
-<img width="677" height="433" alt="image" src="https://github.com/user-attachments/assets/b09f10e0-21b8-4908-9b5f-e6f1526aba75" />
+<img width="565" height="554" alt="image" src="https://github.com/user-attachments/assets/703bc328-f005-4cd1-9a21-18372bb8a509" />
 
 
 ### Figure 4. Clonal architecture and evolutionary trajectories with WM driver mutation genes and chr1q gain or chr6q loss
