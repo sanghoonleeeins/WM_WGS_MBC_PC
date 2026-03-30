@@ -22,7 +22,7 @@ Sanghoon Lee\*, Patrick Blaney\* , Dylan C. Gagler, Di Zhang, Lisa Cervia, Tom G
 
 \[Add screenshot here\]
 
-<img width="877" height="677" alt="image" src="https://github.com/user-attachments/assets/f0b76116-cccc-47ac-a70e-b9cdd931ec97" />
+<img width="677" height="577" alt="image" src="https://github.com/user-attachments/assets/f0b76116-cccc-47ac-a70e-b9cdd931ec97" />
 
 **Visiaul Abstract** The direction of Waldenström Macroglobulinemia whole genome sequencing (WGS) data analysis\]
 
