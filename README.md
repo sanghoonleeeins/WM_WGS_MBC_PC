@@ -69,23 +69,22 @@ https://github.com/sanghoonleeeins/Figure2_VAF_SBSsignature
 
 https://github.com/sanghoonleeeins/Figure3_CopyNumberAbnormality
 
-<img width="565" height="554" alt="image" src="https://github.com/user-attachments/assets/703bc328-f005-4cd1-9a21-18372bb8a509" />
+<img width="625" height="584" alt="image" src="https://github.com/user-attachments/assets/703bc328-f005-4cd1-9a21-18372bb8a509" />
 
 
 ### Figure 4. Clonal architecture and evolutionary trajectories with WM driver mutation genes and chr1q gain or chr6q loss
 
 https://github.com/sanghoonleeeins/Figure4_ClonalArchitecture
 
-<img width="722" height="480" alt="image" src="https://github.com/user-attachments/assets/9911d28b-25b5-449f-9654-7f84b84988ba" />
+<img width="622" height="440" alt="image" src="https://github.com/user-attachments/assets/9911d28b-25b5-449f-9654-7f84b84988ba" />
 
 
 ### Figure 5. Genomic landscape of SVs in peripheral B cell lymphoma and WM subtypes
 
 https://github.com/sanghoonleeeins/Figure5_GenomicLandscapeSV
 
-<img width="725" height="675" alt="image" src="https://github.com/user-attachments/assets/cc8e0092-54b2-4d72-9aa6-5e4e0d08e40b" />
+<img width="571" height="779" alt="image" src="https://github.com/user-attachments/assets/3f267cd4-2eea-41b2-b18e-ad0e85fbb954" />
 
-<img width="557" height="255" alt="image" src="https://github.com/user-attachments/assets/9c0e6c5d-cf17-4976-b1dc-552e7380e48a" />
 
 ### Figure 6. 
 
