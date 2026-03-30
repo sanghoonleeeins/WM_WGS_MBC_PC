@@ -1,0 +1,48 @@
+SmpID	MutGeneSymb	Subtype	chr01_p	chr01_q	chr02_p	chr02_q	chr03_ChromosomeWhole	chr03_p	chr03_q	chr04_ChromosomeWhole	chr04_p	chr04_q	chr05_p	chr05_q	chr06_p	chr06_q	chr07_p	chr07_q	chr08_p	chr08_q	chr09_p	chr09_q	chr10_p	chr10_q	chr11_p	chr11_q	chr12_ChromosomeWhole	chr12_p	chr12_q	chr13_p	chr14_q	chr15_q	chr16_ChromosomeWhole	chr16_p	chr16_q	chr17_p	chr17_q	chr18_ChromosomeWhole	chr18_p	chr18_q	chr19_p	chr19_q	chr20_p	chr20_q	chr21_p	chr21_q	chr22_p	chr22_q	NotAvail_NotAvail
+01_076	"CARD11,CD79B,H1-4,MYD88"	G1_MBC_LIKE																													Loss																		
+01_115	"CARD11,MYD88,SP140"	G2_PC_LIKE																																															NotAvail
+01_131	MYD88	G2_PC_LIKE																																															NotAvail
+01_163	"MYD88,SP140"	G2_PC_LIKE																																											Gain				
+01_190	"ARID1A,CXCR4"	G1_MBC_LIKE		Loss												Loss			Loss	Loss						Loss																							
+04_006	"CD79B,CXCR4,EZH2,MYD88"	G2_PC_LIKE			Gain				Gain																																								
+WM22	MYD88	G2_PC_LIKE														Loss				Gain																Loss	Gain												
+WM26	"CXCR4,MYD88"	G2_PC_LIKE		Gain	Gain					Gain																	Gain			Gain	Gain	Gain	Gain					Gain							Gain		Gain		
+WM27	MYD88	G2_PC_LIKE		Gain																												Gain													Gain				
+WM29	"ARID1A,MYD88"	G2_PC_LIKE			Gain																						Gain		Gain																Gain		Gain		
+WM30	MYD88	G2_PC_LIKE			Gain											Loss						Gain								Gain	Gain	Gain												Gain	Gain		Gain		
+WM31	"CXCR4,KMT2D,MYD88"	G1_MBC_LIKE		Gain	Gain																	Gain								Gain		Gain												Gain	Gain		Gain		
+WM32	"KMT2D,MYD88"	G2_PC_LIKE		Gain	Gain										Gain	Loss						Gain								Gain		Gain													Gain		Gain		
+WM33	"CXCR4,MYD88,TP53"	G1_MBC_LIKE		Gain	Gain						Gain	Gain				Loss			Loss											Gain	Gain	Gain			Gain									Gain	Gain		Gain		
+WM37	"CARD11,MYD88"	G2_PC_LIKE								Gain					Gain	Loss																																	
+WM42	MYD88	G2_PC_LIKE													Gain	Loss		Gain																															
+WM43	MYD88	G2_PC_LIKE		Gain	Gain							Gain	Gain			Loss				Gain		Gain		Gain						Gain	Gain	Gain				Loss	Gain					Gain		Gain	Gain		Gain		
+WM46	"H1-4,MAP3K14,MYD88"	G1_MBC_LIKE																																															
+WM47	"ARID1A,H1-4,KMT2D,MAP3K14,MYD88"	G1_MBC_LIKE																		Gain																													
+WM48	CARD11	G2_PC_LIKE														Loss																				Loss													
+WM49		G2_PC_LIKE		Gain	Gain																	Gain								Gain		Gain													Gain		Gain		
+WM52	MYD88	G1_MBC_LIKE								Gain												Loss					Gain										Gain								Gain				
+WM54	"EZH2,MYD88"	G2_PC_LIKE																												Loss																			
+WM65	"CXCR4,H1-4,MAP3K14,MYD88"	G1_MBC_LIKE																																															NotAvail
+WM66	MYD88	G2_PC_LIKE														Loss					Gain	Gain									Gain														Gain				
+WM67	"EZH2,MYD88"	G3_NotAvail																																				Gain											
+WM68	"MYD88,SP140,TP53"	G2_PC_LIKE			Gain											Loss						Gain			Gain					Loss						Loss								Gain	Gain		Gain		
+WM69		G2_PC_LIKE														Loss																Gain													Gain				
+WM70	"CXCR4,MYD88,TP53"	G1_MBC_LIKE				Loss			Gain		Gain	Gain				Loss			Loss	Gain											Gain	Gain												Gain	Gain				
+WM72	"CXCR4,EZH2,MYD88"	G2_PC_LIKE		Gain						Gain																				Gain		Gain						Gain							Gain		Gain		
+WM73	"CARD11,MYD88"	G2_PC_LIKE														Loss																													Gain				
+WM74	"CARD11,CD79B,MYD88"	G3_NotAvail		Loss																																		Gain											
+WM77		G3_NotAvail		Gain																										Gain		Gain													Gain		Gain		
+WM8	"CARD11,MYD88"	G2_PC_LIKE		Gain	Gain				Gain		Gain	Gain			Gain	Loss						Gain								Gain	Gain	Gain												Gain	Gain		Gain		
+WM80		G3_NotAvail						Loss	Gain					Loss							Loss	Loss		Loss								Loss						Gain							Gain				
+WM82	"CD79B,CXCR4,MYD88,TP53"	G3_NotAvail													Loss	Loss		Loss																															
+WM83	"CXCR4,MYD88"	G3_NotAvail		Loss																																													
+WM84	"MYD88,TP53"	G3_NotAvail						Loss			Loss	Loss				Loss			Loss	Loss	Loss							Loss		Loss	Gain	Gain				Loss								Gain	Gain				
+WM85	"CD79B,CXCR4,MYD88"	G3_NotAvail																														Gain													Gain		Gain		
+WM86		G3_NotAvail		Gain																		Gain										Gain													Gain				
+WM87	"CXCR4,MYD88"	G3_NotAvail		Gain			Gain																																						Gain				
+WM89	"CARD11,MYD88"	G3_NotAvail													Gain	Loss																													Gain				
+WM9	"MAP3K14,SP140"	G1_MBC_LIKE							Gain										Loss																										Gain				
+WM90	"H1-4,MYD88"	G3_NotAvail			Gain	Gain						Gain	Gain	Gain	Gain	Gain	Gain	Gain	Gain	Gain	Gain	Gain	Gain	Gain	Gain	Gain				Gain		Gain		Gain	Gain	Gain	Gain		Gain	Gain	Gain		Gain	Gain	Gain	Gain	Gain	Gain	
+WM95	MYD88	G3_NotAvail		Loss																												Loss																	
+WM96	"CXCR4,MYD88"	G3_NotAvail														Loss																																	
+WM97		G3_NotAvail																																															NotAvail

@@ -1,0 +1,567 @@
+---
+title: "Figure3_CopyNumberAbnormality"
+author: "Sanghoon Lee"
+format: html
+editor: visual
+---
+
+## Figure 3. Copy number abnormality profiles
+
+**A.** Cumulative CNA across all chromosomes in 47 WM cases.
+
+**B.** Expanded view of chromosome 1q.
+
+**C.** Expanded view of chromosome 6q in 24 WM cases.
+
+**D.** Expanded view of chromosome 6q across WM subtypes and an ideogram for B cell–associated genes in the region.
+
+## Lectures or useful websites
+
+[Lecutre for GenVisR](https://genviz.org/module-03-genvisr/0003/05/01/cnFreq_GenVisR/)
+
+## Step1. Load necessary R packages
+
+```{r}
+library(karyoploteR)
+library(GenVisR) # Bioconductor
+library(dplyr)
+library(GenomicRanges)
+library(ggplot2) # facet_grid()
+library(circlize) # rand_color(n=4)  To choose random colors.
+library(data.table)
+
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir); print(dir) #  "/Users/lees130/Library/CloudStorage/OneDrive-NYULangoneHealth/N05b_WaldenstromMacroglobulinemia_Dylan/12_Github_WMWGS_Quarto/Figure3_CopyNumberAbnormality"
+
+### Metadata
+MetadataProcFile <- "Metadata_Proc.rds"
+Chr6GeneAnnotFile <- "GCF_000001405.40_GRCh38.p14_genomic_Chr6.txt"     ## You can make this file yourself by extracting only Chr6 region. Otherwise, email me. 
+source("Source_GenVisR_Modified_ByCNVSegment_BycnQual.R")
+ChromosomeArmBandStartStopFile <-  "ChromosomeArmBandStartStop.rds"
+CentromereDataFile <- "Centromere_1bpPlaceholder_UCSC_hg38.txt"
+ChromosomeArmSubtypeCNVStateFile <- "ChromosomeArmSubtypeCNVState_AllSmp47_ManualProc_v1.2.txt"
+```
+
+## Step2. Read input data.
+
+```{r}
+cnData_NoWM91WM93WM94 <- readRDS("cnData_NoWM91WM93WM94.rds")
+
+## metadata for MBC-like and PC-like information 
+MetadataProc <- readRDS(MetadataProcFile); dim(MetadataProc); MetadataProc[1:2,]
+colnames(MetadataProc)[colnames(MetadataProc)=="SmpName"] <- "sample"
+
+## inner_join between MetadataProc and cnData_NoWM91WM93WM94. 
+cnData_NoWM91WM93WM94_Metadata <- dplyr::inner_join(cnData_NoWM91WM93WM94, MetadataProc[, c("sample","Subtype")] ); dim(cnData_NoWM91WM93WM94_Metadata) # 2189 18 
+# saveRDS(cnData_NoWM91WM93WM94_Metadata, file="cnData_NoWM91WM93WM94_Metadata.rds")
+
+## split to MBC-like, PC-like or NotAvail 
+cnData_NoWM91WM93WM94_MBCLike <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(Subtype=="G1_MBC_LIKE") %>% select(-Subtype) ; dim(cnData_NoWM91WM93WM94_MBCLike) # 493 17
+cnData_NoWM91WM93WM94_PCLike <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(Subtype=="G2_PC_LIKE") %>% select(-Subtype) ; dim(cnData_NoWM91WM93WM94_PCLike) # 964 17
+cnData_NoWM91WM93WM94_NotAvail <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(Subtype=="G3_NotAvail") %>% select(-Subtype) ; dim(cnData_NoWM91WM93WM94_NotAvail) # 693 17
+```
+
+## Step3. Create Figure 3A
+
+```{r}
+# Run it
+# pdf("/Users/gagled01/morganLab/Waldenstroms/WGS/figures/GenVisR_Overall_CNVPlot_Draft.pdf", height = 8, width = 20)
+# pdf("GenVisR_Overall_CNVPlot_Draft.pdf", height = 8, width = 20)
+#       cnFreq(cnData, genome="hg38") + ggplot2::facet_grid(. ~ chromosome, scales="free")
+# dev.off()
+
+## CentromereRegion <- ggplot2::geom_vline(xintercept = c(123400000,123400001,   93900000,93900001,    90900000, 90900001), linetype = "dashed", size=0.2)  # This doesn't work. 
+
+chr_levels <- paste0("chr", c(1:22, "X", "Y"))
+cnData_NoWM91WM93WM94$chromosome <- factor(cnData_NoWM91WM93WM94$chromosome, levels = chr_levels)
+
+# centromere_df <- data.frame(chromosome = c("chr1", "chr2", "chr3"), centromere = c(123400000, 93900000, 90900000) )
+# centromere_df$chromosome <- factor(centromere_df$chromosome, levels = chr_levels)
+
+## Read Centromere 1bp placeholder data
+centromere_df <- fread(CentromereDataFile, header=TRUE, stringsAsFactors=FALSE); dim(centromere_df); centromere_df[1:2,] # 24 3
+#       Chromosome     Start       End
+#        <char>     <int>     <int>
+# 1:       chr1 123400000 123400001
+colnames(centromere_df)[1:2]<- c('chromosome', 'centromere')
+centromere_df$centromere[centromere_df$chromosome=="chr22"]<- 15000000
+centromere_df$chromosome <- factor(centromere_df$chromosome, levels = chr_levels)
+
+CentromereRegion <- ggplot2::geom_vline(data = centromere_df, aes(xintercept = centromere), linetype = "dashed", linewidth = 0.2)
+
+
+## 1) All chromosome all samples
+# CNVPlot_NoWM91WM93WM94<- GenVisR::cnFreq(cnData_NoWM91WM93WM94, genome="hg38") + ggplot2::facet_grid(. ~ chromosome, scales="free") # This is original working. 
+CNVPlot_NoWM91WM93WM94_Centromere <- GenVisR::cnFreq(cnData_NoWM91WM93WM94, genome="hg38", plotLayer=CentromereRegion) + ggplot2::facet_grid(. ~ chromosome, scales="free") ## If I want to draw vertical lines of the centromere region in the GenVisR plot. 
+# print(CNVPlot_NoWM91WM93WM94_Centromere)
+ggplot2::ggsave(filename="Fig3A_GenVisR_Overall_CNVPlot_NoWM91WM93WM94_AllSubject_Centromere.pdf", CNVPlot_NoWM91WM93WM94_Centromere, width=20, height=8)
+
+
+# CentromereRegion <- ggplot2::geom_vline(xintercept = c(59800000, 59800001))
+# ggplot2::ggsave(filename="GenVisR_Overall_CNVPlot_NoWM91WM93WM94_AllSubject_v1.3.pdf", CNVPlot_NoWM91WM93WM94,plotLayer=CentromereRegion, width=20, height=8)
+
+
+
+## 2) All chromosome, MBC-Like 
+length(unique(cnData_NoWM91WM93WM94_MBCLike$sample)) # 10
+CNVPlot_NoWM91WM93WM94_MBC <- GenVisR::cnFreq(cnData_NoWM91WM93WM94_MBCLike, genome="hg38") + ggplot2::facet_grid(. ~ chromosome, scales="free")
+ggplot2::ggsave(filename="GenVisR_Overall_CNVPlot_AllChromosome_MBCLike10s_v1.1.pdf", CNVPlot_NoWM91WM93WM94_MBC, width=20, height=8)
+
+## 3) All chromosome, PC-Like 
+length(unique(cnData_NoWM91WM93WM94_PCLike$sample)) # 22
+CNVPlot_NoWM91WM93WM94_PC <- GenVisR::cnFreq(cnData_NoWM91WM93WM94_PCLike, genome="hg38") + ggplot2::facet_grid(. ~ chromosome, scales="free")
+ggplot2::ggsave(filename="GenVisR_Overall_CNVPlot_AllChromosome_PCLike22s_v1.0.pdf", CNVPlot_NoWM91WM93WM94_PC, width=20, height=8)
+
+## 4) All chromosome, NotAvail
+length(unique(cnData_NoWM91WM93WM94_NotAvail$sample)) # 15
+CNVPlot_NoWM91WM93WM94_NotAvail<- GenVisR::cnFreq(cnData_NoWM91WM93WM94_NotAvail, genome="hg38") + ggplot2::facet_grid(. ~ chromosome, scales="free")
+ggplot2::ggsave(filename="GenVisR_Overall_CNVPlot_AllChromosome_NotAvail15s_v1.0.pdf", CNVPlot_NoWM91WM93WM94_NotAvail, width=20, height=8)
+
+
+# Just chr6
+# blimp1 <- ggplot2::geom_vline(xintercept = c(82169987, 89926528,  105992690, 142751469)) # IBTK, BACH2, BLIMP1, HIVEP2
+# pdf("/Users/gagled01/morganLab/Waldenstroms/WGS/figures/GenVisR_Chr6_CNVPlot.pdf", height = 8, width = 20)
+# cnFreq(cnData, genome="hg38", plotChr = "chr6", plotLayer = blimp1)
+# dev.off()
+
+CentromereRegion <- ggplot2::geom_vline(xintercept = c(59800000, 59800001))  # Centromere region
+CNVPlot_Chr6 <- cnFreq(cnData_NoWM91WM93WM94, genome="hg38", plotChr = "chr6", plotLayer = CentromereRegion); 
+ggplot2::ggsave(filename="GenVisR_CNVPlot_Chr6_v1.2.pdf", CNVPlot_Chr6, width=5, height=4)
+
+
+
+#cnSpec(cnData, genome="hg38")
+```
+
+## Step4. Figure 3B-C: Make CNV plot for individual subject, only Chr6q or only Chr1q
+
+```{r}
+dim(cnData_NoWM91WM93WM94_Metadata); table(cnData_NoWM91WM93WM94_Metadata$sample) # 2142  18
+# 01-076 01-115 01-131 01-163 01-190 04-006   WM22   WM26   WM27   WM29   WM30   WM31   WM32   WM33   WM37   WM42   WM43   WM46   WM47   WM48   WM49   WM52   WM54   WM65   WM66   WM67   WM68   WM69   WM70   WM72 
+#     36     43     40     40     88     40     41     44     37     44     47     46     44     62     37     48     72     41     47     39     42     33     30     37     43     32     50     44     59     37 
+#   WM73   WM74   WM77    WM8   WM80   WM82   WM83   WM84   WM85   WM86   WM87   WM89    WM9   WM90   WM95   WM96   WM97 
+#     45     35     36     57     43     51     49     99     40     43     43     37     36     71     53     31     30 
+
+AllSubject <- unique(cnData_NoWM91WM93WM94_Metadata$sample); print(AllSubject) 
+#  [1] "01-076" "01-115" "01-131" "01-163" "01-190" "04-006" "WM22"   "WM26"   "WM27"   "WM29"   "WM30"   "WM31"   "WM32"   "WM33"  
+# [15] "WM37"   "WM42"   "WM43"   "WM46"   "WM47"   "WM48"   "WM49"   "WM52"   "WM54"   "WM65"   "WM66"   "WM67"   "WM68"   "WM69"  
+# [29] "WM70"   "WM72"   "WM73"   "WM74"   "WM77"   "WM8"    "WM80"   "WM82"   "WM83"   "WM84"   "WM85"   "WM86"   "WM87"   "WM89"  
+# [43] "WM9"    "WM90"   "WM95"   "WM96"   "WM97"  
+
+for (EachSubject in AllSubject) {
+    ## EachSubject <- AllSubject[10]; print(EachSubject)
+    ## subset by each subject 
+    cnData_NoWM91WM93WM94_EachSubject <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(sample %in% EachSubject) %>% select(-Subtype); dim(cnData_NoWM91WM93WM94_EachSubject) # 36 17
+
+    CNVPlot_NoWM91WM93WM94_EachSubject <- GenVisR::cnFreq(cnData_NoWM91WM93WM94_EachSubject, genome="hg38") + ggplot2::facet_grid(. ~ chromosome, scales="free")
+    CNVPlot_NoWM91WM93WM94_EachSubject  ## Plot display doesn't work 
+    ggplot2::ggsave(filename=paste0("GenVisR_Overall_CNVPlot_NoWM91WM93WM94_",EachSubject ,"_v1.2.pdf"), CNVPlot_NoWM91WM93WM94_EachSubject, width=20, height=8)
+} 
+
+```
+
+## Step5. Make a table to summarize Gain or Loss in each chromosome p/q arm and in each sample
+
+```{r}
+ChromosomeArmBandStartStop<- readRDS(ChromosomeArmBandStartStopFile); dim(ChromosomeArmBandStartStop); ChromosomeArmBandStartStop[1:2,] # 862 5
+#   Chromosome Arm   Band    Start    Stop
+#   <chr>      <chr> <chr>   <int>   <int>
+# 1 chr1       p     36.33       1 2300000
+# 2 chr1       p     36.32 2300001 5300000
+
+##### I should add 0 in front of chr"1" ... chr"9" to sort Chr#_Gain|Loss by the order of Chromosome numbers
+ChromosomeArmBandStartStop$Chromosome <- ifelse(grepl("chr\\d$", ChromosomeArmBandStartStop$Chromosome), gsub("chr","chr0",ChromosomeArmBandStartStop$Chromosome ), 
+                                            ChromosomeArmBandStartStop$Chromosome)
+
+########### filter only CNV state =1 or > 3
+cnData_GainLoss_AllSmp <- data.frame()
+for (EachSubject in AllSubject) {
+    ## EachSubject <- AllSubject[2]; print(EachSubject)
+    ## subset by each subject 
+    cnData_NoWM91WM93WM94_EachSubject <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(sample %in% EachSubject);     
+    dim(cnData_NoWM91WM93WM94_EachSubject) # 36 17
+    ## filter the bins that have gain >= 3 or loss==1, and "end-start > 1e+6
+    cnData_GainLoss <- cnData_NoWM91WM93WM94_EachSubject %>% data.frame %>% dplyr::filter((segmean==1|segmean >=3)&((end-start)>=1e+6 ) ) %>%
+                                      dplyr::filter(!chromosome %in% c("chrM","chrX","chrY","chr23")) %>% dplyr::select(c(chromosome, start, end,segmean, sample, Subtype));
+    dim(cnData_GainLoss)
+    if(nrow(cnData_GainLoss)==0) {
+          cnData_GainLoss <- data.frame("chromosome"="NotAvail", "start"=0, "end"=0,"segmean"=0, 
+                                        "sample"=EachSubject, "Subtype"=unique(cnData_NoWM91WM93WM94_EachSubject$Subtype))
+    }
+    cnData_GainLoss_AllSmp <- dplyr::bind_rows(cnData_GainLoss_AllSmp,cnData_GainLoss )
+    
+    ##### I should add 0 in front of chr"1" ... chr"9" to sort Chr#_Gain|Loss by the order of Chromosome numbers
+    cnData_GainLoss_AllSmp$chromosome <- ifelse(grepl("chr\\d$", cnData_GainLoss_AllSmp$chromosome), gsub("chr","chr0",cnData_GainLoss_AllSmp$chromosome ), cnData_GainLoss_AllSmp$chromosome)
+    
+}    ## end of for loop 
+dim(cnData_GainLoss_AllSmp) # 296 6
+
+########### ########################## Annotate the bin region with p or q arm 
+
+RowData_BindRow <- data.frame(); LoopNumb<-0
+TotalNumb_Bin <- nrow(cnData_GainLoss_AllSmp); print(TotalNumb_Bin) # 295
+for (i in 1:TotalNumb_Bin ) {
+    # i<-248
+    LoopNumb<-LoopNumb+1; print(paste0("LoopNumb: ", LoopNumb))
+    RowData <- cnData_GainLoss_AllSmp[i, ]
+    
+    if(RowData$start != 0) {  ## NotAvail has start position 0 
+          ## Extract the Chromosome Position from "ChromosomeArmBandStartStop" by Chr#, start, end 
+          ChromosomeArmBandStartStop_SubsetBystart <- ChromosomeArmBandStartStop %>% dplyr::filter(Chromosome==RowData$chromosome, Start <= RowData$start, Stop >= RowData$start) 
+             # print(ChromosomeArmBandStartStop_SubsetBystart)
+          ChromosomeArmBandStartStop_SubsetByend <- ChromosomeArmBandStartStop %>% dplyr::filter(Chromosome==RowData$chromosome, Start <= RowData$end, Stop >= RowData$end) 
+            #  print(ChromosomeArmBandStartStop_SubsetByend)
+        
+          if(ChromosomeArmBandStartStop_SubsetBystart$Arm == ChromosomeArmBandStartStop_SubsetByend$Arm) {
+                ArmPQ <- as.character(ChromosomeArmBandStartStop_SubsetBystart$Arm)
+          } else if (ChromosomeArmBandStartStop_SubsetBystart$Arm != ChromosomeArmBandStartStop_SubsetByend$Arm) {
+                  # ArmPQ <- "pqCentromere"
+            
+                  ### Some bins have ArmPQ: "pqCentromere" I should replace them with p, q, ChromosomeWhole
+                  if(RowData$chromosome %in% c("chr02","chr11","chr21","chr22")) {
+                         ArmPQ <- "p"
+                  } else if (RowData$chromosome %in% c("chr01","chr08","chr09","chr10","chr13","chr14","chr15","chr17","chr20")) {
+                         ArmPQ <- "q"
+                  } else if (RowData$chromosome %in% c("chr03") & RowData$end == 198215400) {
+                         ArmPQ <- "q"
+                  } else if (RowData$chromosome %in% c("chr03", "chr04") & RowData$start <= 13000 & RowData$end >= 190000000) {
+                         ArmPQ <- "ChromosomeWhole"
+                  } else if (RowData$chromosome %in% c("chr04") & RowData$start == 49072176 ) {
+                         ArmPQ <- "p"
+                  } else if (RowData$chromosome %in% c("chr04") & RowData$start >= 35000000 ) {
+                         ArmPQ <- "q"
+                  } else if (RowData$chromosome %in% c("chr05") & RowData$start == 46427400 ) {
+                         ArmPQ <- "p"
+                  } else if (RowData$chromosome %in% c("chr06") & RowData$start <= 130000 & RowData$end >= 60000000) {
+                         ArmPQ <- "p"
+                  } else if (RowData$chromosome %in% c("chr06") & RowData$start == 39081429 ) {
+                         ArmPQ <- "q"
+                  } else if (RowData$chromosome %in% c("chr19") ) {
+                         ArmPQ <- "q"
+                  } else if (RowData$chromosome %in% c("chr12", "chr16","chr18") ) {
+                         ArmPQ <- "ChromosomeWhole"
+                  } else { 
+                         ArmPQ <- "pqCentromere"
+                  }
+          }
+          ArmBandStart <-  ChromosomeArmBandStartStop_SubsetBystart$Band
+          ArmBandEnd <- ChromosomeArmBandStartStop_SubsetByend$Band
+    } else {
+          ArmPQ <- "NotAvail"
+    }
+    RowData$ChrArm <- ArmPQ
+    RowData$ArmBandStart <- ArmBandStart
+    RowData$ArmBandEnd <- ArmBandEnd
+    #### Add one more column to indicate 'Chr#_Loss' or 'Chr#_Gain'  
+    # RowData$ChrCNVState<-ifelse(RowData$segmean==1, paste0(RowData$chromosome,  "_Loss"), ifelse(RowData$segmean >= 3, paste0(RowData$chromosome,"_Gain"),
+    #                               ifelse(RowData$segmean==0, "NotAvail","")))
+
+    #### dplyr::bind_rows 
+    RowData_BindRow <- dplyr::bind_rows(RowData_BindRow, RowData) 
+     
+}
+dim(RowData_BindRow); RowData_BindRow[1:2,]; # 299   9
+# RowData_BindRow_PQCentromere <- RowData_BindRow %>% dplyr::filter(ChrArm=="pqCentromere")
+# RowData_BindRow_Chr1q <- RowData_BindRow %>% dplyr::filter(chromosome=="chr01", ChrArm=="q")
+
+#### Add one more column to indicate 'Chr#_p' or 'Chr#_q'  
+RowData_BindRow_PQArm <- RowData_BindRow %>% dplyr::mutate(ChrPQArm = paste0(chromosome, "_",ChrArm),  
+                                   ChrCNVState=ifelse(RowData_BindRow$segmean==1,"Loss", ifelse(RowData_BindRow$segmean >= 3,"Gain",ifelse(RowData_BindRow$segmean==0, "NotAvail",""))))  # %>%
+                                 #  dplyr::filter(!grepl("NotAvail",RowData_BindRow$chromosome)) 
+
+table(RowData_BindRow_PQArm$ChrPQArm) ; dim(RowData_BindRow_PQArm) #  299  11
+# chr01_Gain chr01_Loss chr02_Gain chr02_Loss chr03_Gain chr03_Loss chr04_Gain chr04_Loss chr05_Gain chr05_Loss chr06_Gain chr06_Loss chr07_Gain chr07_Loss chr08_Gain chr08_Loss chr09_Gain 
+#         17         16         15          1          6          3         12          4          3          1          9         25          3          1          7         13         13 
+# chr09_Loss chr10_Gain chr10_Loss chr11_Gain chr11_Loss chr12_Gain chr12_Loss chr13_Gain chr13_Loss chr14_Gain chr14_Loss chr15_Gain chr15_Loss chr16_Gain chr17_Gain chr17_Loss chr18_Gain 
+#          5          3          1          3          1          4          1         13          7          8          1         23          2          4          5          3          7 
+# chr19_Gain chr20_Gain chr21_Gain chr22_Gain   NotAvail 
+#          2         10         28         15          4 
+
+#### I should find duplicated rows by 'sample', 'ChrPQArm', 'ChrCNVState' and remove them. 
+RowData_BindRow_PQArm_sort <- RowData_BindRow_PQArm %>% arrange(chromosome, sample); 
+print(RowData_BindRow_PQArm_sort[5:7,])
+#   chromosome     start       end segmean sample     Subtype ChrArm ChrPQArm ChrCNVState
+# 5      chr01  69702329  72828300       1 01-190 G1_MBC_LIKE      p  chr01_p        Loss
+# 6      chr01  73170435  79058766       1 01-190 G1_MBC_LIKE      p  chr01_p        Loss
+# 7      chr01 168079200 171494292       1 01-190 G1_MBC_LIKE      q  chr01_q        Loss
+
+RowData_BindRow_PQArm_NoDup <- RowData_BindRow_PQArm_sort %>% dplyr::mutate(SmpChrPQArmCNVState=paste0(sample,"_",ChrPQArm,"_",ChrCNVState)) %>% 
+          dplyr::filter(!duplicated(SmpChrPQArmCNVState)); dim(RowData_BindRow_PQArm_NoDup) # 266 10 
+# View(RowData_BindRow_PQArm_NoDup)
+length(unique(RowData_BindRow_PQArm_NoDup$sample)) # 47
+
+################### Extract rows by sampleID and do bind_row() 
+ChromosomeArmSubtypeCNVState_AllSmp <- data.frame(); ForLoopNumb<-0
+for (EachSmpID in AllSubject) {
+      # EachSmpID <- AllSubject[1]
+      ForLoopNumb <- ForLoopNumb + 1; print(paste0("Current for loop numb:", ForLoopNumb))
+      ChromosomeArmSubtypeCNVState_Subset <- RowData_BindRow_PQArm_NoDup %>% dplyr::filter(sample==EachSmpID) %>% dplyr::select(c(sample,Subtype, ChrPQArm, ChrCNVState )) #
+                      # %>% tibble::column_to_rownames("ChrPQArm") %>% t %>% data.frame; print(ChromosomeArmSubtypeCNVState_Subset)
+      ## fill the empty data.frame with the values I found.  
+      
+      ###################  Empty data.frame of the final table
+      FinalDF_ChrPQArm_GainLoss <- data.frame(matrix(nrow=1, ncol=(length(unique(RowData_BindRow_PQArm_NoDup$ChrPQArm)))+2))  ### Total number of columns is 50
+      colnames(FinalDF_ChrPQArm_GainLoss) <- c("SampleID","Subtype", sort(unique(RowData_BindRow_PQArm_NoDup$ChrPQArm)) )  ## ncol=50
+
+      for(i in 1:nrow(ChromosomeArmSubtypeCNVState_Subset)) {
+          # i<-1
+          FinalDF_ChrPQArm_GainLoss$SampleID=ChromosomeArmSubtypeCNVState_Subset[i,]$sample
+          FinalDF_ChrPQArm_GainLoss$Subtype=ChromosomeArmSubtypeCNVState_Subset[i,]$Subtype
+          FinalDF_ChrPQArm_GainLoss[,colnames(FinalDF_ChrPQArm_GainLoss)==ChromosomeArmSubtypeCNVState_Subset[i,]$ChrPQArm]=ChromosomeArmSubtypeCNVState_Subset[i,]$ChrCNVState
+      }
+      ChromosomeArmSubtypeCNVState_AllSmp <- dplyr::bind_rows(ChromosomeArmSubtypeCNVState_AllSmp, FinalDF_ChrPQArm_GainLoss)
+}
+
+dim(ChromosomeArmSubtypeCNVState_AllSmp) # 47 49
+
+fwrite(ChromosomeArmSubtypeCNVState_AllSmp, file="ChromosomeArmSubtypeCNVState_AllSmp47_v1.2.txt", col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE )
+
+```
+
+## Step6. Make Supple Figure 2A, bar plot to count the number of Gain/Loss in each chromosome from "ChromosomeArmSubtypeCNVState_AllSmp47.txt" data
+
+```{r}
+
+ChromosomeArmSubtypeCNVGainLoss <- data.table::fread(paste0(dir, "/", ChromosomeArmSubtypeCNVStateFile), header=TRUE, stringsAsFactors=FALSE)
+dim(ChromosomeArmSubtypeCNVGainLoss); ChromosomeArmSubtypeCNVGainLoss[1:2,1:5] # 47  50
+#      SampleID     Subtype chr01_p chr01_q chr02_p
+#        <char>      <char>  <char>  <char>  <char>
+# 1:    01-076 G1_MBC_LIKE  
+
+ChrNumber_ColName <- colnames(ChromosomeArmSubtypeCNVGainLoss); print(ChrNumber_ColName)
+#  [1] "SampleID"              "Subtype"               "chr01_p"               "chr01_q"               "chr02_p"               "chr02_q"               "chr03_ChromosomeWhole" "chr03_p"              
+#  [9] "chr03_q"               "chr04_ChromosomeWhole" "chr04_p"               "chr04_q"               "chr05_p"               "chr05_q"               "chr06_p"               "chr06_q"              
+# [17] "chr07_p"               "chr07_q"               "chr08_p"               "chr08_q"               "chr09_p"               "chr09_q"               "chr10_p"               "chr10_q"              
+# [25] "chr11_p"               "chr11_q"               "chr12_ChromosomeWhole" "chr12_p"               "chr12_q"               "chr13_q"               "chr14_q"               "chr15_q"              
+# [33] "chr16_ChromosomeWhole" "chr16_p"               "chr16_q"               "chr17_p"               "chr17_q"               "chr18_ChromosomeWhole" "chr18_p"               "chr18_q"              
+# [41] "chr19_p"               "chr19_q"               "chr20_p"               "chr20_q"               "chr21_p"               "chr21_q"               "chr22_p"               "chr22_q"              
+# [49] "NotAvail_NotAvail" 
+
+## Remove 'chr03_p', 'chr04_p', 'chr12_p', 'chr16_ChromosomeWhole', 'chr18_p', 'NotAvail_NotAvail'
+ChromosomeArmSubtypeCNVGainLoss_Proc <- ChromosomeArmSubtypeCNVGainLoss %>% dplyr::select(-c(chr03_p, chr04_p, chr12_p, chr16_ChromosomeWhole, chr18_p, NotAvail_NotAvail))
+colnames(ChromosomeArmSubtypeCNVGainLoss_Proc)
+
+StackBarplot_Func <- function(ChromosomeArmSubtypeCNVGainLoss=ChromosomeArmSubtypeCNVGainLoss,MySubtype="G1_MBC_LIKE") {
+      ChromosomeArmSubtypeCNVGainLoss_MBC <- ChromosomeArmSubtypeCNVGainLoss %>% dplyr::filter(Subtype==MySubtype) %>% dplyr::select(-Subtype) #  %>% 
+                                           #  tibble::column_to_rownames("SampleID") %>% data.frame; dim(ChromosomeArmSubtypeCNVGainLoss_MBC) # 10 44
+      ChromosomeArmSubtypeCNVGainLoss_MBC[1:2,]
+      # SampleID     chr01_p chr01_q chr02_p chr02_q chr03_p chr03_q chr04_p chr04_q chr05_p chr05_q chr06_p chr06_q chr07_p chr07_q chr08_p chr08_q chr09_p chr09_q chr10_p chr10_q chr11_p 
+      # 01-076                         
+      
+      all_chromosome_arms <- ChromosomeArmSubtypeCNVGainLoss_MBC %>% select(starts_with("chr")) %>% colnames()
+   
+      GainLossCountTable_Long <- ChromosomeArmSubtypeCNVGainLoss_MBC %>%
+        # Convert row names into a proper column for pivoting
+        #tibble::rownames_to_column(var = "SampleID") %>%
+        
+        # Pivot the data longer: turn all chromosome columns into two columns (Arm and CNV_Status)
+        tidyr::pivot_longer(cols = starts_with("chr"), names_to = "Arm", values_to = "CNV_Status") %>%
+        # Filter out all empty/blank strings ("")
+        filter(CNV_Status != "") %>%
+        # Group by the CNV type (Gain/Loss) and the Chromosome Arm
+        group_by(CNV_Status, Arm) %>%
+        # Count the number of observations for each combination
+        summarise(Count = n(), .groups = 'drop') %>% 
+        # 3. Fill missing combinations with Count = 0.
+        tidyr::complete( CNV_Status = c("Gain", "Loss"),   Arm=all_chromosome_arms, fill = list(Count = 0) )
+      
+      print("--- Data Frame for ggplot2 (Long Format) ---")
+      print(GainLossCountTable_Long)
+      
+      # --- 3. ggplot2 Visualization Section ---
+      # 3a. Create the stacked bar chart using ggplot2
+      cnv_plot_ggplot <- ggplot(GainLossCountTable_Long, aes(x = Arm, y = Count, fill = CNV_Status)) +
+        # Use geom_bar with stat="identity" to plot pre-calculated counts
+        geom_bar(stat = "identity", position = "stack") +
+        # Define custom colors
+        scale_fill_manual(values = c("Gain" = "#FF66FF" , "Loss" = "#1b98e0" )) +
+        # Add labels and title
+        labs( title = "CNV Gain/Loss Counts by Chromosome Arm", x = "Chromosome Arm", y = "Count", fill = "CNV Status" ) + # Legend title
+       
+        # Apply a clean theme (optional, but highly recommended)
+        theme_minimal() +
+        # Improve axis text appearance
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold"), # Center title
+          axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels
+          ### Remove grid lines
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank()
+        )
+      
+      PlotHeight=max(GainLossCountTable_Long$Count)*0.4
+      if(MySubtype=="G1_MBC_LIKE" ) PlotHeight=2.5
+      if(MySubtype=="G2_PC_LIKE" ) PlotHeight=4
+      ggsave(filename = paste0(dir , "/", paste0("SuppleFig2A_StackBarplot_CountGainLossPerChr_",gsub("G1_|G2_|G3_|_","",MySubtype),"v1.2.pdf")) , plot = cnv_plot_ggplot,  width=12, height=PlotHeight,  units = "in")
+} 
+
+### 1) MBC-like subset
+StackBarplot_Func(ChromosomeArmSubtypeCNVGainLoss=ChromosomeArmSubtypeCNVGainLoss_Proc, MySubtype="G1_MBC_LIKE")
+
+### 2) PC-like subset
+StackBarplot_Func(ChromosomeArmSubtypeCNVGainLoss=ChromosomeArmSubtypeCNVGainLoss_Proc, MySubtype="G2_PC_LIKE")
+
+### 3) NotAvail subset
+StackBarplot_Func(ChromosomeArmSubtypeCNVGainLoss=ChromosomeArmSubtypeCNVGainLoss_Proc, MySubtype="G3_NotAvail")
+
+
+```
+
+## Step 7. GenVisR plot and Segment horizontal line for Chr6q Region for all 47s, MBC-like, PC-like or NotAvail
+
+Extract only chr6q deletions and see the segment size by MBC-like and PC-like. Use cnFreq_Modified() use at "Source_GenVisR_Modified_ByCNVSegment_BycnQual.R"
+
+```{r}
+### 1) all Chr6q regions for All 47 smp
+table(cnData_NoWM91WM93WM94$sample); length(table(cnData_NoWM91WM93WM94$sample)); dim(cnData_NoWM91WM93WM94) # 47  # 2142 17
+
+cnData_Chr6qOnly <- cnData_NoWM91WM93WM94 %>% dplyr::filter(chromosome=="chr6"); dim(cnData_Chr6qOnly) # 69 17
+table(cnData_Chr6qOnly$sample); length(table(cnData_Chr6qOnly$sample)) # 24  
+saveRDS(cnData_Chr6qOnly, "cnData_Chr6qOnly.rds")
+## dplyr::filter(chromosome=="chr6", start > 61*10^6 ) # 32 17 <<<<<<<<==========This exclude samples in the group that don't have loss in Chr6q
+## so GenVisR plot couldn't reflect the exact number of samples. So, I added one line in "Source_GenVisR_Modified_ByCNVSegments_BycnQual.R
+
+CentromereRegion <- ggplot2::geom_vline(xintercept = c(59800000, 59800001))
+CNVPlot_Chr6DelRegion <- cnFreq_Modified(x=cnData_Chr6qOnly, genome="hg38", plotChr = "chr6", plotLayer = CentromereRegion, WMSubtype="AllType", ChrNumb="Chr6q", 
+                                         ChrStartPosition=59800000, ChrEndPosition=170805979)
+ggplot2::ggsave(filename="GenVisR_CNVPlot_Chr6qOnly_All24smp_v1.6_MoreXaxisLabel.pdf", CNVPlot_Chr6DelRegion, width=8, height=4)
+
+### 2) Chr6q - MBC-LIKE
+cnData_NoWM91WM93WM94_MBCLike_Chr6q <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(chromosome=="chr6" ) %>% dplyr::filter(Subtype=="G1_MBC_LIKE") %>% select(-Subtype) ; dim(cnData_NoWM91WM93WM94_MBCLike_Chr6q) 
+## dplyr::filter(chromosome=="chr6", start > 61*10^6 ) # 32 17 <<<<<<<<==========This exclude samples in the group that don't have loss in Chr6q
+## so GenVisR plot couldn't reflect the exact number of samples. So, I added one line in "Source_GenVisR_Modified_ByCNVSegments_BycnQual.R
+
+saveRDS(cnData_NoWM91WM93WM94_MBCLike_Chr6q, "cnData_NoWM91WM93WM94_MBCLike_Chr6q.rds")
+
+table(cnData_NoWM91WM93WM94_MBCLike_Chr6q$sample)
+# 01-076 01-190   WM31   WM33   WM46   WM47   WM52   WM65   WM70    WM9 
+#      1     29      1      3      1      3      1      1      2      1 
+
+CentromereRegion <- ggplot2::geom_vline(xintercept = c(59800000, 59800001))
+CNVPlot_Chr6qDelRegion_MBC <- cnFreq_Modified(x=cnData_NoWM91WM93WM94_MBCLike_Chr6q, genome="hg38", plotChr="chr6", plotLayer=CentromereRegion,  WMSubtype="MBCLike", ChrNumb="Chr6q", 
+                                              ChrStartPosition=59800000, ChrEndPosition=170805979)
+ggplot2::ggsave(filename="GenVisR_CNVPlot_Chr6qOnly_MBC3smp_v1.6_MoreXaxisLabel.pdf", CNVPlot_Chr6qDelRegion_MBC, width=6, height=4)
+
+### 3) Chr6q - PC-LIKE
+cnData_NoWM91WM93WM94_PCLike_Chr6q <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(chromosome=="chr6") %>% dplyr::filter(Subtype=="G2_PC_LIKE") %>% select(-Subtype) ; dim(cnData_NoWM91WM93WM94_PCLike_Chr6q) # 52 17
+## dplyr::filter(chromosome=="chr6", start > 61*10^6 ) %>%
+
+saveRDS(cnData_NoWM91WM93WM94_PCLike_Chr6q, "cnData_NoWM91WM93WM94_PCLike_Chr6q.rds")
+
+table(cnData_NoWM91WM93WM94_PCLike_Chr6q$sample); length(table(cnData_NoWM91WM93WM94_PCLike_Chr6q$sample)) # 12 
+# 01-115 01-131 01-163 04-006   WM22   WM26   WM27   WM29   WM30   WM32   WM37   WM42   WM43   WM48   WM49   WM54   WM66   WM68   WM69   WM72   WM73    WM8 
+#      3      3      1      1      3      1      1      3      3      2      3      6      3      3      1      1      2      2      3      1      2      4 
+     
+CNVPlot_Chr6qDelRegion_PC_Chr6q <- cnFreq_Modified(x=cnData_NoWM91WM93WM94_PCLike_Chr6q, genome="hg38", plotChr="chr6", plotLayer=CentromereRegion,  WMSubtype="PCLike", ChrNumb="Chr6q", 
+                                                     ChrStartPosition=59800000, ChrEndPosition=170805979) 
+ggplot2::ggsave(filename="GenVisR_CNVPlot_Chr6qOnly_PC12smp_v1.6_MoreXaxisLabel.pdf", CNVPlot_Chr6qDelRegion_PC_Chr6q, width=6, height=4)
+
+
+### 4) Chr6q - NotAvail
+cnData_NoWM91WM93WM94_NotAvail_Chr6q <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(chromosome=="chr6") %>% 
+                                  dplyr::filter(Subtype=="G3_NotAvail") %>% select(-Subtype);  # , start > 61*10^6 
+dim(cnData_NoWM91WM93WM94_NotAvail_Chr6q) # 45 17
+
+saveRDS(cnData_NoWM91WM93WM94_NotAvail_Chr6q, "cnData_NoWM91WM93WM94_NotAvail_Chr6q.rds")
+
+# table(cnData_NoWM91WM93WM94_NotAvail_Chr6q$sample); length(table(cnData_NoWM91WM93WM94_NotAvail_Chr6q$sample)) # 15
+# WM67 WM74 WM77 WM80 WM82 WM83 WM84 WM85 WM86 WM87 WM89 WM90 WM95 WM96 WM97 
+#    3    1    1    1   10    1    4    3    4    5    2    3    1    5    1 
+
+CNVPlot_Chr6qDelRegion_NotAvail_Chr6q <- cnFreq_Modified(x=cnData_NoWM91WM93WM94_NotAvail_Chr6q, genome="hg38", plotChr="chr6", plotLayer=CentromereRegion,  WMSubtype="NotAvail", ChrNumb="Chr6q", 
+                                                          ChrStartPosition=59800000, ChrEndPosition=170805979) 
+ggplot2::ggsave(filename="GenVisR_CNVPlot_Chr6qOnly_NotAvail5smp_v1.6_MoreXaxisLabel.pdf", CNVPlot_Chr6qDelRegion_NotAvail_Chr6q, width=6, height=4)
+
+
+```
+
+#### Extract genes in a certain region of Chromosome 6.
+
+```{r}
+Chr6GeneAnnot <- fread(Chr6GeneAnnotFile, header=FALSE, stringsAsFactors=FALSE); dim(Chr6GeneAnnot); Chr6GeneAnnot[1:2,] #  95165     9
+colnames(Chr6GeneAnnot) <- c("ChrNumb","Curated","ExonIntrol","Start","End","Score","Strand","Sign", "Info"); Chr6GeneAnnot[1:2,]
+
+Chr6GeneAnnot_Gene <- Chr6GeneAnnot %>% dplyr::filter(ExonIntrol=="gene"); dim(Chr6GeneAnnot_Gene) #  2529    9
+
+MSB_Start <- 99637055;  # StartX[1] in MSB-Like
+MSB_End <- 99654926     # EndX[1] in MSB-Like  ## 0 genes
+
+MSB_Start <-155930053   # StartX[27] in MSB-Like
+MSB_End <- 170741611     # EndX[27] in MSB-Like  ## 290 genes. Black line. 
+
+MSB_Start <- 79967200;  # StartX[2] in MSB-Like
+MSB_End <- 80080718     # EndX[2] in MSB-Like  ## 3 
+
+MSB_Start <- 140759906;  # StartX[3] in MSB-Like
+MSB_End <- 140918400     # EndX[3] in MSB-Like  ## # same as StartX[1] and EndX[1]
+
+MSB_Start <- 90929121;  # StartX[6] in MSB-Like
+MSB_End <- 91166300     # EndX[6] in MSB-Like  ## # 0 
+
+MSB_Start <- 91167400;  # StartX[7] in MSB-Like
+MSB_End <- 91416000     # EndX[7] in MSB-Like  ## # 1
+
+MSB_Start <-73536500   # StartX[26] in MSB-Like
+MSB_End <- 79965809     # EndX[26] in MSB-Like # 78 
+
+
+Chr6GeneAnnot_GeneInRegion <- Chr6GeneAnnot_Gene %>% dplyr::filter( (Start > MSB_Start) & (End < MSB_End) ); dim(Chr6GeneAnnot_GeneInRegion) # 169 9
+
+
+```
+
+## GenVisR plot and Segment horizontal line for Chr1q Region for all 47s, MBC-like, PC-like or NotAvail \<\<\<\<\<\<=== Chr1q
+
+Extract onley chr1q deletions and see the segment size by MBC-like and PC-like. Use cnFreq_Modified() at "Source_GenVisR_Modified_ByCNVSegment_BycnQual.R"
+
+```{r}
+### ============== 1) all Chr1q regions for All 47 smp
+table(cnData_NoWM91WM93WM94$sample); length(table(cnData_NoWM91WM93WM94$sample)) # 47 
+
+cnData_Chr1qOnly <- cnData_NoWM91WM93WM94 %>% dplyr::filter(chromosome=="chr1"); dim(cnData_Chr1qOnly) # 66 17 # dplyr::filter(chromosome=="chr1", start > 1.217*10^8 )
+table(cnData_Chr1qOnly$sample); length(table(cnData_Chr1qOnly$sample)) # 47
+
+CentromereRegion <- ggplot2::geom_vline(xintercept = c(123400000, 123400001))
+CNVPlot_Chr1DelRegion <- cnFreq_Modified(x=cnData_Chr1qOnly, genome="hg38", plotChr="chr1", plotLayer=CentromereRegion, WMSubtype="AllType", ChrNumb="Chr1q",
+                                       ChrStartPosition=123300000, 	ChrEndPosition=248956422 )
+ggplot2::ggsave(filename="GenVisR_CNVPlot_Chr1qOnly_All30smp_v1.6_MoreXaxisLabel.pdf", CNVPlot_Chr1DelRegion, width=8, height=4)
+
+### ============== 2) Chr1q - MBC-LIKE
+cnData_Chr1q_NoWM91WM93WM94_MBCLike <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(chromosome=="chr1", start > 1.217*10^8 ) %>% dplyr::filter(Subtype=="G1_MBC_LIKE") %>% select(-Subtype) ; dim(cnData_Chr1q_NoWM91WM93WM94_MBCLike) # 15 17
+
+saveRDS(cnData_Chr1q_NoWM91WM93WM94_MBCLike, "cnData_Chr1q_NoWM91WM93WM94_MBCLike.rds")
+
+table(cnData_Chr1q_NoWM91WM93WM94_MBCLike$sample)  ## 6 subjects
+# 01-190   WM31   WM33   WM52   WM65   WM70 
+#      8      1      2      1      2      1 
+
+CentromereRegion <- ggplot2::geom_vline(xintercept = c(123400000, 123400001))
+CNVPlot_Chr1DelRegion_MBC <- cnFreq_Modified(x=cnData_Chr1q_NoWM91WM93WM94_MBCLike, genome="hg38", plotChr="chr1", plotLayer=CentromereRegion,  WMSubtype="MBCLike",  ChrNumb="Chr1q", 
+                                               ChrStartPosition=123300000, 	ChrEndPosition=248956422 )
+ggplot2::ggsave(filename="GenVisR_CNVPlot_Chr1qOnly_MBC6smp_v1.5_MoreXaxisLabel.pdf", CNVPlot_Chr1DelRegion_MBC, width=6, height=4)
+
+### ============== 3) Chr1q - PC-LIKE
+cnData_Chr1q_NoWM91WM93WM94_PCLike <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(chromosome=="chr1", start > 1.217*10^8 ) %>% dplyr::filter(Subtype=="G2_PC_LIKE") %>% select(-Subtype) ; dim(cnData_Chr1q_NoWM91WM93WM94_PCLike) # 29  17
+
+table(cnData_Chr1q_NoWM91WM93WM94_PCLike$sample); length(table(cnData_Chr1q_NoWM91WM93WM94_PCLike$sample)) # 16
+#   01-115 01-131   WM22   WM26   WM27   WM29   WM30   WM32   WM43   WM49   WM66   WM68   WM69   WM72   WM73    WM8 
+#    3      3      1      2      2      1      1      2      2      2      2      1      2      2      2      1 
+
+CNVPlot_Chr1DelRegion_PC <- cnFreq_Modified(x=cnData_Chr1q_NoWM91WM93WM94_PCLike, genome="hg38", plotChr="chr1", plotLayer=CentromereRegion,  WMSubtype="PCLike", ChrNumb="Chr1q",
+                                              ChrStartPosition=123300000, 	ChrEndPosition=248956422 ) 
+ggplot2::ggsave(filename="GenVisR_CNVPlot_Chr1qOnly_PC16smp_v1.5_MoreXaxisLabel.pdf", CNVPlot_Chr1DelRegion_PC, width=6, height=4)
+
+### ============== 4) Chr1q - NotAvail
+cnData_Chr1q_NoWM91WM93WM94_NotAvail <- cnData_NoWM91WM93WM94_Metadata %>% dplyr::filter(chromosome=="chr1", start >1.217*10^8  ) %>% dplyr::filter(Subtype=="G3_NotAvail") %>% select(-Subtype);
+dim(cnData_Chr1q_NoWM91WM93WM94_NotAvail) # 22 17
+
+table(cnData_Chr1q_NoWM91WM93WM94_NotAvail$sample); length(table(cnData_Chr1q_NoWM91WM93WM94_NotAvail$sample)) # 8
+#   WM74 WM77 WM83 WM84 WM86 WM87 WM90 WM95 
+#    2    1    4    2    2    2    1    8 
+
+CNVPlot_Chr1DelRegion_NotAvail <- cnFreq_Modified(x=cnData_Chr1q_NoWM91WM93WM94_NotAvail, genome="hg38", plotChr="chr1", plotLayer=CentromereRegion,  WMSubtype="NotAvail",  ChrNumb="Chr1q", 
+                                                    ChrStartPosition=123300000, 	ChrEndPosition=248956422 ) 
+ggplot2::ggsave(filename="GenVisR_CNVPlot_Chr1qOnly_NotAvail8smp_v1.5_MoreXaxisLabel.pdf", CNVPlot_Chr1DelRegion_NotAvail, width=6, height=4)
+
+
+```
