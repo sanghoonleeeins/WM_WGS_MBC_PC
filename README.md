@@ -58,32 +58,32 @@ Find "Fig1_WM_WGS_SomaticMutation.qmd" file and open it on your RStudio.
 
 <img width="760" height="599" alt="image" src="https://github.com/user-attachments/assets/58a22b47-a1d2-4da1-b138-9cea55198d0d" />
 
-<img width="581" height="354" alt="image" src="https://github.com/user-attachments/assets/e12910b1-a80e-4aed-820a-421c8dd5d849" />
+<img width="651" height="384" alt="image" src="https://github.com/user-attachments/assets/e12910b1-a80e-4aed-820a-421c8dd5d849" />
 
 ### Figure 2. Variant allele frequency (VAF) and single base substitution (SBS) signature
 
-https://github.com/sanghoonleeeins/Fig2_WM_WGS_VAF_SBS
+https://github.com/sanghoonleeeins/Figure2_VAF_SBSsignature
 
 <img width="723" height="587" alt="image" src="https://github.com/user-attachments/assets/5ab311a5-fb4d-44a4-81a1-aed675a8f098" />
 
 
 ### Figure 3. Copy number abnormality profiles.
 
-https://github.com/sanghoonleeeins/Fig3_WM_WGS_CNA
+https://github.com/sanghoonleeeins/Figure3_CopyNumberAbnormality
 
 <img width="677" height="433" alt="image" src="https://github.com/user-attachments/assets/b09f10e0-21b8-4908-9b5f-e6f1526aba75" />
 
 
 ### Figure 4. Clonal architecture and evolutionary trajectories with WM driver mutation genes and chr1q gain or chr6q loss
 
-https://github.com/sanghoonleeeins/Fig4_WM_WGS_Phylogeny
+https://github.com/sanghoonleeeins/Figure4_ClonalArchitecture
 
 <img width="722" height="480" alt="image" src="https://github.com/user-attachments/assets/9911d28b-25b5-449f-9654-7f84b84988ba" />
 
 
 ### Figure 5. Genomic landscape of SVs in peripheral B cell lymphoma and WM subtypes
 
-https://github.com/sanghoonleeeins/Fig5_WM_WGS_StructuralVariant
+https://github.com/sanghoonleeeins/Figure5_GenomicLandscapeSV
 
 <img width="725" height="675" alt="image" src="https://github.com/user-attachments/assets/cc8e0092-54b2-4d72-9aa6-5e4e0d08e40b" />
 
