@@ -78,7 +78,7 @@ https://github.com/sanghoonleeeins/Fig3_WM_WGS_CNA
 
 https://github.com/sanghoonleeeins/Fig4_WM_WGS_Phylogeny
 
-<img width="551" height="340" alt="image" src="https://github.com/user-attachments/assets/fa4fa209-e3bd-4c9f-8484-14345e2862bc" />
+<img width="722" height="480" alt="image" src="https://github.com/user-attachments/assets/9911d28b-25b5-449f-9654-7f84b84988ba" />
 
 
 ### Figure 5. Genomic landscape of SVs in peripheral B cell lymphoma and WM subtypes
@@ -87,7 +87,7 @@ https://github.com/sanghoonleeeins/Fig5_WM_WGS_StructuralVariant
 
 <img width="725" height="675" alt="image" src="https://github.com/user-attachments/assets/cc8e0092-54b2-4d72-9aa6-5e4e0d08e40b" />
 
-<img width="417" height="200" alt="image" src="https://github.com/user-attachments/assets/9c0e6c5d-cf17-4976-b1dc-552e7380e48a" />
+<img width="517" height="255" alt="image" src="https://github.com/user-attachments/assets/9c0e6c5d-cf17-4976-b1dc-552e7380e48a" />
 
 ### Figure 6. 
 
