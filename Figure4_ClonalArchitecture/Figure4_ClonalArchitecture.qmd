@@ -1,0 +1,1204 @@
+---
+title: "Figure4_ClonalArchitecture"
+author: "Sanghoon Lee"
+format: html
+editor: visual
+---
+
+## Figure 4. Clonal architecture and evolutionary trajectories with WM driver mutation genes and chr1q gain or chr6q loss
+
+A. MBC-like group that harbor MYD88, CXCR4, or CD79B mutations, chr1q gain or chr6q loss.
+
+B. PC-like group.
+
+C. Not-determined group. Clonal architecture of more cases is available in Supplementary Figure 6.
+
+## Lectures or useful websites
+
+[Lecutre for Pyclone VI](https://github.com/Roth-Lab/pyclone-vi) [Lecutre for Pairtree](https://github.com/morrislab/pairtree)
+
+## Step1. Load necessary R packages
+
+```{r}
+library(tidyverse)
+library(data.table)
+library(ggtree) ## bioconductor
+library(ggrepel)
+library(glue)
+
+library(GenomeInfoDb) # BiocManager::install("GenomeInfoDb", force = TRUE)
+# ls("package:GenomeInfoDb") |> grep("Seqinfo") # this is wrong way to test 
+getClass("Seqinfo")
+
+## Then, load GenomicRanges
+library(GenomicRanges) # BiocManager::install("GenomicRanges", force = TRUE)
+
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir); print(dir)
+
+```
+
+# A. Map FACETS and Pyclone VI output files
+
+## Step2. Read FACETS output and Pyclone VI output files and count the number of mutation IDs and find chr1q gain and chr6q loss
+
+```{r}
+FacetsOutFileAll <- list.files(".", pattern="facets.cnv.txt", full.names=TRUE); length(FacetsOutFileAll) # 51
+PycloneOutFileAll <- list.files(".", pattern=".tsv", full.names=TRUE); length(PycloneOutFileAll) # 51
+
+```
+## Step3. Make a function to map FACETS and Pyclone VI output files. 
+
+```{r}
+
+ Funct_CountMutID_Chr1qChr6q <- function(FacetsOutFileAll=FacetsOutFileAll, ChrNumbArm=ChrNumbArm ) {
+      ClusterID_NumberMutation_AllSmpChrArm <- data.frame(); LoopNumb <- 0; Mean_cfem_DF_AllSmp <- data.frame(); 
+      ClusterID_NumberMutation_Meancfem_List <- list();
+      for(EachFacetsOut in FacetsOutFileAll) {
+          #################################################################################################
+          ## Step 1 — Load FACETS segments and identify 6q‑loss regions
+          ## tcn.em (total CN)   ## lcn.em (minor CN)
+          ## Chr6q Loss:  1) start > 6q-arm-start (≈ 60 Mb) 2) tcn.em < 2 OR lcn.em == 0 (LOH)
+          #################################################################################################
+        
+          # EachFacetsOut <- FacetsOutFileAll[1]; ## 5 is 01-190   14 is WM33 Chr1q Gain. # 41 is WM86, 42 is WM87
+          print(paste0("Each facets out file: ",EachFacetsOut ))
+        
+          SampleID <- gsub("(.*)/|\\.facets.cnv.txt","",EachFacetsOut );#  print(SampleID)
+          SampleID_Short <- gsub("_(.*)","", SampleID)
+          # [1] "01-190_B_S6_001_vs_01-190_T_S18_001"
+        
+          if(ChrNumbArm=="Chr6q") {
+                if (grepl("WM80|WM83|WM85|WM87",SampleID)){ 
+                      next 
+                } else if (!grepl("01-190|WM70|WM33|WM8|WM22|WM30|WM32|WM37|WM42|WM43|WM48|WM66|WM68|WM69|WM73|WM82|WM84|WM86|WM89|WM96",SampleID )) {                           
+                      ## MBC-like: 01-190, WM70, WM33 (n=3)   ## PC-like: WM8_|WM22|WM30|WM32|WM37|WM42|WM43|WM48|WM66|WM68|WM69|WM73| (n=12)
+                      ## NotAvail: WM82|WM84|WM86|WM89|WM96 (n=5)
+                      next
+                } 
+          } else if(ChrNumbArm=="Chr1q") {
+            if (!grepl("WM33|WM49|WM32|WM72|WM43|WM26|WM27|WM29|WM8_|WM90|WM86|WM87",SampleID )) {                           
+              ## MBC-like: WM33 (n=1)   ## PC-like: WM49|WM32|WM72|WM43|WM26|WM27|WM8 (n=7)  ## NotAvail: WM90|WM86|WM87 (n=3)
+              next
+            } 
+          }
+          print(paste0("sample ID that is running: ", SampleID) )
+            
+          LoopNumb <- LoopNumb+1;
+          
+          # Load FACETS cncf output
+          cncf <- fread(paste0(dir, gsub("\\./", "/", EachFacetsOut)), header=TRUE, sep="\t")
+          
+          ##################     ##################     ##################     ##################     ##################     ################## 
+          ### Let's calculate cf.em for chr6q 
+          ### cell fraction (cf.em) ~1, CNV is clonal (almost all tumor cells)    /  cf.em < 1  CNV is subclonal. 
+          #  Loss:  (mcols(facets_clean)$tcn < 2 | mcols(facets_clean)$lcn == 0)  / Gain: tcn.em > 2
+          ##################     ##################     ##################     ##################     ##################     ################## 
+          if(ChrNumbArm=="Chr6q") {
+                cncf_ChrArm <- cncf %>% dplyr::filter(chrom==6, (start>=59800001|end>=59800001),tcn.em<2, lcn.em==0); dim(cncf_ChrArm) # 16 15
+                Mean_cfem <- mean(cncf_ChrArm$cf.em); print(paste0("Mean cf.em in chr6q loss: ", Mean_cfem))
+                Mean_cfem_DF <- data.frame("SmpID"=SampleID_Short, "Mean_cfem_Chr6qLoss"=Mean_cfem)
+          } else if (ChrNumbArm=="Chr1q") {
+                cncf_ChrArm <- cncf %>% dplyr::filter(chrom==1, (start>=123400001|end>=123400001),tcn.em>2 ) ; dim(cncf_ChrArm) # 16 15  tcn>2 is enough condition to find ‘gain’
+                Mean_cfem <- mean(cncf_ChrArm$cf.em); print(paste0("Mean cf.em in chr6q loss: ", Mean_cfem))
+                Mean_cfem_DF <- data.frame("SmpID"=SampleID_Short, "Mean_cfem_Chr1qGain"=Mean_cfem)
+          }
+         
+          Mean_cfem_DF_AllSmp <- dplyr::bind_rows(Mean_cfem_DF_AllSmp,Mean_cfem_DF)
+          ############################################################################################################################## 
+          
+          # Convert to GRanges
+          facets_gr <- GRanges(
+            seqnames = cncf$chrom,
+            ranges   = IRanges(start = cncf$start, end = cncf$end),
+            tcn      = cncf$tcn.em,
+            lcn      = cncf$lcn.em
+          )
+          length(facets_gr) # 88 # WM33 : 62
+          
+          table(seqnames(facets_gr))  ## chr numbers are numeric. 
+          # 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 
+          # 17  6  1  1  1 29  1  8  3  1  3  1  1  4  1  1  3  1  1  1  1  1  1 
+          # seqlevels(facets_gr) <- as.character(seqlevels(facets_gr)) # not working
+          levels(seqnames(facets_gr)) <- as.character(levels(seqnames(facets_gr)))
+          
+          sum(is.na(seqnames(facets_gr)))
+          sum(is.na(start(facets_gr)))
+          sum(is.na(end(facets_gr)))
+          sum(is.na(mcols(facets_gr)$tcn))
+          sum(is.na(mcols(facets_gr)$lcn)) # 2   here is NA
+          
+          ##################### by ChrNumbArm:  Chr1q or Chr6q   ##################### 
+          if(ChrNumbArm=="Chr6q") { 
+                keep <- !is.na(seqnames(facets_gr)) &
+                  !is.na(start(facets_gr)) & !is.na(end(facets_gr)) &
+                  !is.na(mcols(facets_gr)$tcn) &  !is.na(mcols(facets_gr)$lcn)
+          } else if (ChrNumbArm=="Chr1q") {
+                keep <- !is.na(seqnames(facets_gr)) &
+                  !is.na(start(facets_gr)) & !is.na(end(facets_gr)) &
+                  !is.na(mcols(facets_gr)$tcn) 
+          } 
+          ####################################################################################
+          facets_clean <- facets_gr[keep];   length(facets_clean) # 86 
+          
+          # Add "chr" prefix to FACETS segments
+          # Step 1: update seqlevels
+          seqlevels(facets_clean) <- paste0("chr", seqlevels(facets_clean))
+          
+          # Step 2: update seqnames # this is already done. 
+          # seqnames(facets_clean) <- paste0("chr", seqnames(facets_clean))
+         
+          ##################### by ChrNumbArm:  Chr1q or Chr6q   ##################### 
+          if(ChrNumbArm=="Chr6q") {
+                # Identify chr6q loss segments
+                ChrArm_GainLoss <- facets_clean[
+                  seqnames(facets_clean) == "chr6" &
+                    (start(facets_clean) >= 59800001 & end(facets_clean) >= 59800001) &    # 6q arm starts ~60 Mb  Don't use 6000000. I should use 59800001 because WM37 has chr6q loss from 59803500
+                    (mcols(facets_clean)$tcn < 2 | mcols(facets_clean)$lcn == 0)
+                ]; 
+                length(ChrArm_GainLoss) # 16 
+          } else if(ChrNumbArm=="Chr1q") {
+                # Identify chr1q gain segments
+                ChrArm_GainLoss <- facets_clean[
+                  seqnames(facets_clean) == "chr1" &
+                    (start(facets_clean) >= 123400001 | end(facets_clean) >= 123400001) &   #   "end(facets_clean) >= 123400001" is necessary because a few sample's chr1q gain starts from P arm. 
+                    (mcols(facets_clean)$tcn > 2 )
+                ]
+          }
+          #####################  ##################### ##################### 
+          
+          #################################################################################################
+          ## Step 2 — Load PyClone output and convert mutation positions to GRanges
+          ## mutation_id (e.g., "chr10_100276374_CG_C")
+          #################################################################################################
+          ## Find pyclone out file 
+          EachPycloneOutFile <- grep(SampleID, PycloneOutFileAll, value=TRUE)
+          
+          # Load PyClone output
+          pycloneout <- fread(EachPycloneOutFile, header=TRUE, sep="\t", stringsAsFactors=FALSE) %>% dplyr::mutate(mutation_id=gsub("mut_","",mutation_id))
+          table(pycloneout$cluster_id)
+          
+          # Extract chr and position from mutation_id
+          pycloneout$chr <- sub("_.*", "", pycloneout$mutation_id)
+          pycloneout$pos <- as.numeric(sub(".*_(\\d+)_.*", "\\1", pycloneout$mutation_id))
+          
+          ##### make a data.frame from total mutation ID count. 
+          table(pycloneout$cluster_id)
+          #   0     1     2 
+          # 1786  2589 13801 
+          TotalCountMutID <- table(pycloneout$cluster_id) %>% as.data.frame
+          colnames(TotalCountMutID)[1] <- "ClusterID"
+          
+          # Convert to GRanges
+          pycloneout_gr <- GRanges(
+            seqnames = pycloneout$chr,
+            ranges   = IRanges(start = pycloneout$pos, width = 1),
+            mutation_id = pycloneout$mutation_id
+          )
+          # pycloneout_gr
+          
+          #################################################################################################
+          ## Step3. Overlap PyClone mutations with chr6q‑loss segments
+          #################################################################################################
+         
+          ## To not get warnings in findOverlaps()
+          # pycloneout_gr <- GenomeInfoDb::keepSeqlevels(pycloneout_gr, value = intersect(seqlevels(pycloneout_gr), seqlevels(ChrArm_GainLoss)), pruning.mode = "coarse")
+          # ChrArm_GainLoss  <- GenomeInfoDb::keepSeqlevels(ChrArm_GainLoss,    value = intersect(seqlevels(pycloneout_gr), seqlevels(ChrArm_GainLoss)), pruning.mode = "coarse")
+          
+          ### To convert chr23 -> chrX 
+          seqlevels(ChrArm_GainLoss)[seqlevels(ChrArm_GainLoss) == "chr23"] <- "chrX"
+          
+          hits <- findOverlaps(pycloneout_gr, ChrArm_GainLoss); length(0)
+          # Warning message:
+          #   In .merge_two_Seqinfo_objects(x, y) :
+          #   Each of the 2 combined objects has sequence levels not in the other:
+          #   - in 'x': chrX, chrY
+          # - in 'y': chr23  ###  <<<<<<<========  Error occurs here: FACETS uses chr23 for chrX     
+          # Make sure to always combine/compare objects based on the same reference
+          # genome (use suppressWarnings() to suppress this warning).
+          
+          # Mutations that fall inside 6q loss
+          mut_in_6q_loss <- pycloneout[queryHits(hits), ]
+          ClusterID_NumberMutation <- table(mut_in_6q_loss$cluster_id) %>% as.matrix %>% as.data.frame; class(ClusterID_NumberMutation) # data.frame
+          print(ClusterID_NumberMutation)
+          
+          ClusterID_NumberMutation <- ClusterID_NumberMutation %>% tibble::rownames_to_column("ClusterID") 
+          print(ClusterID_NumberMutation)
+          #     ClusterID         V1
+          # 1         0            6
+          # 2         1            5
+          # 3         2           416
+          # Yes, your claim is conceptually valid if done carefully—
+          # but it needs to be framed as “6q loss is present in the clone represented by cluster 2,” 
+          # not “6q loss is caused by those mutations.”
+          
+          ### inner_join TotalCountMutID and ClusterID_NumberMutation to make ClusterID_NumberMutation_TotalCount
+          ClusterID_NumberMutation_TotalCount <- dplyr::left_join(TotalCountMutID, ClusterID_NumberMutation) #   %>% dplyr::mutate(V1=paste0(ClusterID_NumberMutation$V1, "_", TotalCountMutID$Freq))
+          ClusterID_NumberMutation_TotalCount[is.na(ClusterID_NumberMutation_TotalCount)] <-0 
+          
+          ##################### by ChrNumbArm:  Chr1q or Chr6q   ##################### 
+          if(ChrNumbArm=="Chr6q") { 
+                  ClusterID_NumberMutation_TotalCount <- ClusterID_NumberMutation_TotalCount %>% dplyr::mutate(Chr6qMutCount_TotalCount = paste0(V1,"_",Freq)) %>% dplyr::select(-c(Freq, V1))
+          } else if(ChrNumbArm=="Chr1q") {
+                  ClusterID_NumberMutation_TotalCount <- ClusterID_NumberMutation_TotalCount %>% dplyr::mutate(Chr1qMutCount_TotalCount = paste0(V1,"_",Freq)) %>% dplyr::select(-c(Freq, V1))
+          }
+          ####################################################################################        
+                  
+          colnames(ClusterID_NumberMutation_TotalCount)[grepl(paste0(ChrNumbArm,"MutCount_TotalCount"), colnames(ClusterID_NumberMutation_TotalCount))] <- paste0(ChrNumbArm,"MutCount_TotalCount_", gsub("_(.*)","", SampleID))
+          print(ClusterID_NumberMutation_TotalCount)
+          #   ClusterID MutIDCount_WM96
+          # 1         0       221_15100
+          # 2         1         11_1434
+      
+          if(LoopNumb==1) {
+                ClusterID_NumberMutation_AllSmpChrArm <- ClusterID_NumberMutation_TotalCount 
+          } else {
+                ClusterID_NumberMutation_AllSmpChrArm <- full_join(ClusterID_NumberMutation_AllSmpChrArm,ClusterID_NumberMutation_TotalCount )
+          }
+      } # end of for-loop
+      # return(ClusterID_NumberMutation_AllSmpChrArm) 
+      # return(Mean_cfem_DF_AllSmp)
+      
+      ClusterID_NumberMutation_Meancfem_List <- c(list(ClusterID_NumberMutation_AllSmpChrArm), list(Mean_cfem_DF_AllSmp))
+      return(ClusterID_NumberMutation_Meancfem_List)
+} # end of function
+
+
+```
+
+## Step4. Mapped data for chr1q gain and chr6q loss
+
+```{r}
+
+##### Chr1q Gain 
+List_ClusterID_NumberMutation_Meancfem_AllSmpChr1q<- Funct_CountMutID_Chr1qChr6q (FacetsOutFileAll=FacetsOutFileAll, ChrNumbArm="Chr1q")
+saveRDS(List_ClusterID_NumberMutation_Meancfem_AllSmpChr1q[[1]], "ClusterID_NumberMutation_Chr1q_11smp_v1.2.rds")
+fwrite(List_ClusterID_NumberMutation_Meancfem_AllSmpChr1q[[1]], file="Summary_ClusterID_Chr1qMutCount_TotalCount_Chr1q_11smp_v1.2.txt", sep="\t", quote=FALSE, col.names=TRUE, row.names=FALSE)
+
+saveRDS(List_ClusterID_NumberMutation_Meancfem_AllSmpChr1q[[2]], "Mean_cfem_Chr1q_11smp_v1.2.rds")
+fwrite(List_ClusterID_NumberMutation_Meancfem_AllSmpChr1q[[2]], file="Summary_Mean_cfem_Chr1q_11smp_v1.2.txt", sep="\t", quote=FALSE, col.names=TRUE, row.names=FALSE)
+
+
+
+##### Chr6q Loss
+List_ClusterID_NumberMutation_Meancfem_AllSmpChr6q<- Funct_CountMutID_Chr1qChr6q (FacetsOutFileAll=FacetsOutFileAll, ChrNumbArm="Chr6q")
+saveRDS(List_ClusterID_NumberMutation_Meancfem_AllSmpChr6q[[1]], "ClusterID_NumberMutation_Chr6q_20smp_v1.2.rds")
+fwrite(List_ClusterID_NumberMutation_Meancfem_AllSmpChr6q[[1]], file="Summary_ClusterID_Chr6qMutCount_TotalCount_Chr6q_20smp_v1.2.txt", sep="\t", quote=FALSE, col.names=TRUE, row.names=FALSE)
+
+saveRDS(List_ClusterID_NumberMutation_Meancfem_AllSmpChr6q[[2]], "Mean_cfem_Chr6q_20smp_v1.2.rds")
+fwrite(List_ClusterID_NumberMutation_Meancfem_AllSmpChr6q[[2]], file="Summary_Mean_cfem_Chr6q_20smp_v1.2.txt", sep="\t", quote=FALSE, col.names=TRUE, row.names=FALSE)
+
+```
+
+# B. Pairtree architecture and make waterdrop plots
+
+## Step1. Read necessary input files. 
+
+```{r}
+MAFData_IndelSNV_OutFile <- "WMWGS_Consensus_MAF_DELINSSNV_47sWM11Gene_ReadMAFMutInput_ExcIntronSilent.txt"
+WMSubtypeData_RmvLowQualityTumor_File <- "WMSubtypeData_RmvLowQualityTumor.rds"
+
+ClusterID_NumberMutation_AllChr6qFile <- "ClusterID_NumberMutation_Chr6q_20smp_v1.2.rds" # from "Step1_Map_FACETS_PycloneInput_FindChr6qLoss.R"
+ClusterID_NumberMutation_AllChr1qFile <- "ClusterID_NumberMutation_Chr1q_11smp_v1.2.rds"
+```
+
+## Step1. Read WM subtype processed data and mutation MAF data file to find only functional mutations. 
+
+```{r}
+## Read WM subtype processed data
+WMSubtypeData_RmvLowQualityTumor <- readRDS(WMSubtypeData_RmvLowQualityTumor_File);dim(WMSubtypeData_RmvLowQualityTumor); WMSubtypeData_RmvLowQualityTumor[1:2,] # 47 4
+#       Tumor_Sample_Barcode Diagnosis Treatment   WMSubtype
+#                     <char>    <char>    <char>      <char>
+#   1:               01_076        ND Rituximab G1_MBC_LIKE
+
+## Read Mutation MAF data file and find only functional mutations.
+MAFData_IndelSNV <- fread(MAFData_IndelSNV_OutFile, header=TRUE, stringsAsFactors=FALSE); dim(MAFData_IndelSNV); MAFData_IndelSNV[1:2,]
+#     Hugo_Symbol Chromosome Start_Position End_Position Reference_Allele Tumor_Seq_Allele2 Tumor_Sample_Barcode Matched_Norm_Sample_Barcode Tumor_Total_Read_Depth
+#         <char>     <char>          <int>        <int>           <char>            <char>               <char>                      <char>                  <int>
+# 1:       MYD88       chr3       38141150     38141150                T                 C               01_076            01-076_T_S23_001                     32
+# 2:       CD79B      chr17       63929439     63929439                A                 G               01_076            01-076_T_S23_001                     24
+
+MAFData_IndelSNV_Functional <- MAFData_IndelSNV %>% dplyr::filter(Hugo_Symbol %in% c("MYD88","CXCR4","CD79B","TP53","ARID1A","H1-4","MAP3K14","SP140","CARD11","KMT2D","EZH2"))
+table(MAFData_IndelSNV_Functional$Hugo_Symbol); length(table(MAFData_IndelSNV_Functional$Hugo_Symbol)) # 11 
+# ARID1A  CARD11   CD79B   CXCR4    EZH2    H1-4   KMT2D MAP3K14   MYD88   SP140    TP53 
+#     4       2       6      13       1       4       2       4      42       3       5 
+
+table(MAFData_IndelSNV_Functional$Tumor_Sample_Barcode); length(table(MAFData_IndelSNV_Functional$Tumor_Sample_Barcode)) # 41
+# 01_076 01_115 01_131 01_163 01_190 04_006   WM22   WM26   WM27   WM29   WM30   WM31   WM32   WM33   WM37   WM42   WM43   WM46   WM47   WM52   WM54   WM65   WM66   WM67   WM68   WM69
+# 2      1      1      1      3      4      1      2      1      1      1      2      1      2      2      1      1      2      2      1      1      2      1      1      1      1
+# WM70   WM72   WM73   WM74    WM8   WM82   WM83   WM84   WM85   WM87   WM89    WM9   WM90   WM95   WM96
+# 2      2      1      3      1      3      2      1      3      2      2      2      2      1      2
+## Unique sample names
+FuncMutation_41Sample <- unique(names(table(MAFData_IndelSNV_Functional$Tumor_Sample_Barcode)))
+
+## Make a new column
+MAFData_IndelSNV_Functional_Proc <- MAFData_IndelSNV_Functional %>% dplyr::mutate(MutationSmpID=paste0(Chromosome,"_",Start_Position,"_",
+                                            Reference_Allele,"_",Tumor_Seq_Allele2,"_", Tumor_Sample_Barcode ) ) %>% 
+                                            dplyr::mutate(MutationSmpID=gsub("-","_",MutationSmpID))
+
+MAFData_IndelSNV_Functional_Proc[1:3,c(1:3,14:17)]; dim(MAFData_IndelSNV_Functional_Proc) # 68 17
+#     Hugo_Symbol Chromosome Start_Position Normal_Reference_Allele_Depth Variant_Type Variant_Classification             MutationSmpID
+#         <char>     <char>          <int>                         <int>       <char>                 <char>                    <char>
+# 1:       MYD88       chr3       38141150                            18          SNP      Missense_Mutation  chr3_38141150_T_C_01_076
+# 2:       CD79B      chr17       63929439                            15          SNP      Missense_Mutation chr17_63929439_A_G_01_076
+# 3:       MYD88       chr3       38141150                            17          SNP      Missense_Mutation  chr3_38141150_T_C_01_11
+
+table(MAFData_IndelSNV_Functional_Proc$Hugo_Symbol); length(table(MAFData_IndelSNV_Functional_Proc$Hugo_Symbol)) ## 11 
+# ARID1A  CARD11   CD79B   CXCR4    EZH2    H1-4   KMT2D MAP3K14   MYD88   SP140    TP53 
+#     4       2       6      13       1       4       2       4      42       3       5
+
+####### Let's print CXCR4 mutation data in "MAFData_IndelSNV_Functional_Proc" 
+####### WM31, 04-006, WM72, WM96 have mismatch in mutation annotation "Chr_StartPosition_Ref_Alt_SmpID" between Pyclone output tsv and MAF.txt files. 
+####### I tried to fix this in Pyclone output .tsv file. below line 112. 
+CXCR4_MAFData <- MAFData_IndelSNV_Functional_Proc %>% dplyr::filter(Hugo_Symbol=="CXCR4"); dim(CXCR4_MAFData) # 13 17 
+# 1:    chr2_136114915_G_T_01_190     2: chr2_136114913_ATGA___04_006     3: chr2_136114915_G_C_WM26     4: chr2_136114971_AG___WM31
+# 5:      chr2_136114915_G_C_WM33     6: chr2_136114915_G_T_WM65          7: chr2_136114922_C_A_WM70     8: chr2_136114975___T_WM72
+# 9:      chr2_136114915_G_T_WM82     10: chr2_136114915_G_C_WM83         11: chr2_136114915_G_C_WM85     12: chr2_136114915_G_C_WM87
+# 13:     chr2_136114971_AG___WM96
+
+```
+## Step2. Read Pyclone-VI output files and combine them.
+Remove clones that have less than 15 mutation_ID support
+
+```{r}
+PycloneOutFile <- list.files(path=".", pattern="PairtreePyclone_ClusterIDMutID*", full.names=TRUE); PycloneOutFile[1:3]; length(PycloneOutFile) # 47
+# [1] "/Users/lees130/Library/CloudStorage/OneDrive-NYULangoneHealth/N05b_WaldenstromMacroglobulinemia_Dylan/26_mutsToTrees_PycloneVI_Pairtree/03_Map_PycloneVIPairtree/PairtreePyclone_ClusterIDMutID_01-076_B_S10_001_vs_01-076_T_S23_001.txt"
+
+LoopCount=0; CloneSizeTableDF <- data.frame() ; MutationSmpID_ClusterID_ByFuncMut_All <- data.frame();
+mean_ccf_per_cluster_DF <- data.frame()
+for (EachOutFile in PycloneOutFile) {
+      LoopCount<- LoopCount+1; print(paste0("LoopCount: ", LoopCount))
+      if (grepl("04-003|WM25|WM46_CD19Pos_KappaPos|WM71|WM91|WM93|WM94", EachOutFile))  next  ## WM46 is duplicated. 
+      # EachOutFile <- PycloneOutFile[22]; print(EachOutFile); print(paste0("Each Pyclone out file: ", EachOutFile))  ## 41 is WM86 ## 42 is WM87
+
+      ##############     ##############     ##############     ##############
+      ## SampleName
+      ##############     ##############     ##############     ##############
+      SampleName <- gsub("(.*)PairtreePyclone_ClusterIDMutID_|_(.*)", "", EachOutFile); print(paste0("SampleName: ", SampleName))
+      ##############     ##############     ##############     ##############
+      ## Open Pyclone output file and get clone number table.
+      ##############     ##############     ##############     ##############
+      PycloneOut <- data.table::fread(EachOutFile, header=TRUE, stringsAsFactors=FALSE); dim(PycloneOut); PycloneOut[1:2,]; table(PycloneOut$cluster_id_Pairtree)  # 8131 6
+      #               mutation_id                            sample_id cluster_id_Pairtree cellular_prevalence cellular_prevalence_std cluster_assignment_prob
+      #                   <char>                               <char>      <int>               <num>                   <num>                   <num>
+      #   1: chr10_109395808_G_T 01-076_B_S10_001_vs_01-076_T_S23_001          0              0.3138                  0.0024                  0.9935
+      #   2: chr10_110766710_C_G 01-076_B_S10_001_vs_01-076_T_S23_001          0              0.3138                  0.0024                  0.8551
+
+      # ### PycloneOutFile[1], 01_076,  MYD88 mutation checking. 
+      table(PycloneOut$cluster_id_Pairtree) 
+      # 0    1    2    3    4 
+      # 2272 3446 1363 1048    2 
+      
+      # PycloneOut[grepl("chr10_111123026",PycloneOut$mutation_id ), ]
+      # PycloneOut[grepl("chr3_38141150",PycloneOut$mutation_id ), ]
+
+      ##############     ##############     ##############     ##############
+      ## Step3. filter out mutations with low probability clone assignment     > 0.30      <<<<<<<============================   in WM86 and WM87, I lost a clone. 
+      ##############     ##############     ##############     ##############
+      PycloneOut_Proc <- PycloneOut %>% dplyr::filter(cluster_assignment_prob> 0.30) %>%
+                              dplyr::mutate(mutation_id=gsub("mut_","",mutation_id)) %>% 
+                              dplyr::mutate(MutationSmpID=paste0(mutation_id, "_", gsub("_(.*)","",sample_id ))) %>%
+                              dplyr::mutate(MutationSmpID=gsub("-","_",MutationSmpID));
+      dim(PycloneOut_Proc); PycloneOut_Proc[1:2,]; table(PycloneOut_Proc$cluster_id_Pairtree) # 4703   10
+      #            mutation_id                            sample_id cluster_id_Pairtree cellular_prevalence cellular_prevalence_std cluster_assignment_prob              MutationSmpID
+      #             <char>                               <char>      <int>               <num>                   <num>                   <num>                     <char>
+      # 1: chr10_109395808_G_T 01-076_B_S10_001_vs_01-076_T_S23_001          0              0.3138                  0.0024                  0.9935 chr10_109395808_G_T_01-076
+      # 2: chr10_110766710_C_G 01-076_B_S10_001_vs_01-076_T_S23_001          0              0.3138                  0.0024                  0.8551 chr10_110766710_C_G_01-076
+      
+      #######################       #######################       #######################       #######################       #######################       ####################### 
+      ########## +++++++++++++   MYD88 mutation checking. WM22 have mismatch in mutation annotation "Chr_StartPosition_Ref_Alt_SmpID"   ########## +++++++++++++  &&&&&&&&&&
+      PycloneOut_Proc[grepl("chr3_38141150_T_C_WM22",PycloneOut_Proc$MutationSmpID ), ] # WM22 should have "chr3_38141150_T_C_WM22"
+      if (SampleName=="WM22") {           ##### This for MYD88
+                ExtraRow <- PycloneOut_Proc[nrow(PycloneOut_Proc),] %>% dplyr::mutate(mutation_id="chr3_38141150_T_C",  MutationSmpID="chr3_38141150_T_C_WM22")
+                PycloneOut_Proc <- dplyr::bind_rows(PycloneOut_Proc, ExtraRow)
+      }
+      
+      #######################       #######################       #######################       #######################       #######################       ####################### 
+      ########## +++++++++++++   CXCR4 mutation checking. WM31, 04-006, WM72, WM96 have mismatch in mutation annotation "Chr_StartPosition_Ref_Alt_SmpID"   ########## +++++++++++++  &&&&&&&&&&
+      PycloneOut_Proc[grepl("chr2_13611",PycloneOut_Proc$MutationSmpID ), ] # 1: chr2_136114970_CAG_C WM31_CD19Pos_vs_WM31_CD3Pos
+      if (SampleName=="WM31") {           ##### This for CXCR4
+            PycloneOut_Proc$MutationSmpID <- gsub("chr2_136114970_CAG_C_WM31","chr2_136114971_AG___WM31", PycloneOut_Proc$MutationSmpID)
+      } else if(SampleName=="04-006") {   ##### This for CXCR4
+            PycloneOut_Proc$MutationSmpID <- gsub("chr2_136114912_GATGA_G_04_006","chr2_136114913_ATGA___04_006", PycloneOut_Proc$MutationSmpID)
+      } else if(SampleName=="WM72") {     ##### This for CXCR4
+            PycloneOut_Proc$MutationSmpID <- gsub("chr2_136114975_G_GT_WM72","chr2_136114975___T_WM72", PycloneOut_Proc$MutationSmpID)
+      } else if(SampleName=="WM96") {     ##### This for CXCR4
+            PycloneOut_Proc$MutationSmpID <- gsub("chr2_136114970_CAG_C_WM96","chr2_136114971_AG___WM96", PycloneOut_Proc$MutationSmpID)
+      } else if(SampleName=="WM85") {     ##### This for CD79B
+            PycloneOut_Proc$MutationSmpID <- gsub("chr17_63929305_G_GTC_WM85","chr17_63929305___TC_WM85", PycloneOut_Proc$MutationSmpID)
+      }
+      
+      ##############     ##############     ##############     ##############
+      ## Step4. make a data.frame from a table.
+      ##############     ##############     ##############     ##############
+      CloneNumbDF <- table(PycloneOut_Proc$cluster_id_Pairtree) %>% data.frame;  dim(CloneNumbDF) # 5 2
+      colnames(CloneNumbDF) <- c("ClusterNumb", SampleName); print(CloneNumbDF);
+      #     ClusterNumb 01-076
+      # 1           0   1925
+      # 2           1   2735
+      # 3           2      1
+
+      ##############     ##############     ##############     ##############
+      ## Step5. Remove clones that have less than 10 mutation_ID support
+      ##############     ##############     ##############     ##############
+      ### Find clone number that has mutation_ID < 10                                   <<<<<<======================   Clones of "Count Mutation ID < 10" are removed. 
+      CloneNumb_LowMutID <- CloneNumbDF$ClusterNumb[CloneNumbDF[,2] < 10]; print(paste0("cluster # not supported: ", CloneNumb_LowMutID))
+      if(length(CloneNumb_LowMutID)!=0 ) {
+            CloneNumbDF_RmvClone <- CloneNumbDF %>% dplyr::filter(!ClusterNumb %in% CloneNumb_LowMutID)
+            TotalNumbClone <- nrow(CloneNumbDF_RmvClone); # print(TotalNumbClone)
+            CloneNumbDF_RmvClone$ClusterNumb <- c(0:(TotalNumbClone-1))
+      } else if (length(CloneNumb_LowMutID)==0 ) {
+            print(paste0("no clone of low MutID"))
+            CloneNumbDF_RmvClone <- CloneNumbDF
+            TotalNumbClone <- nrow(CloneNumbDF_RmvClone); # print(TotalNumbClone)
+            CloneNumbDF_RmvClone$ClusterNumb <- c(0:(TotalNumbClone-1))
+      }
+
+      CloneNumbDF_RmvClone$ClusterNumb <- factor(CloneNumbDF_RmvClone$ClusterNumb, levels=CloneNumbDF_RmvClone$ClusterNumb)
+      
+    
+      if(length(CloneNumb_LowMutID)==0) { CloneNumb_LowMutID <- "None"}
+      print(paste0("CloneNumber Removed by Low MutSupport Clone: ", CloneNumb_LowMutID ))
+      print(CloneNumbDF_RmvClone)
+
+      if(LoopCount==1) {
+            CloneSizeTableDF <- CloneNumbDF_RmvClone
+      }else if(LoopCount>1) {
+            CloneSizeTableDF <- dplyr::full_join(CloneSizeTableDF, CloneNumbDF_RmvClone)  ### This DF is used to make a stacked bar plot and heatmaps.
+      }
+      ##############     ##############     ##############     ##############      ##############     ##############     ##############     ##############  ##############
+      ####################  Functional Mutation Gene
+      ##############     ##############     ##############     ##############      ##############     ##############     ##############     ##############  ##############
+
+      ##############     ##############     ##############     ##############
+      ## Step6. If I removed clone number in the middle of clone numbers due to low number of mutation IDs, I should revise the numbeers
+      ##      For example, if I removed #2 out of #0~#4, I should change #3=>#2, and #4=>#3. 
+      ##############     ##############     ##############     ##############
+      # if(length(CloneNumb_LowMutID)!=0 ) {
+      #       PycloneOut_Proc_RmvClone <- PycloneOut_Proc %>% dplyr::filter(!cluster_id_Pairtree %in% CloneNumb_LowMutID ); dim(PycloneOut_Proc_RmvClone) # 5151    7
+      #       table(PycloneOut_Proc_RmvClone$cluster_id_Pairtree)
+      # 
+      #       if(all(CloneNumb_LowMutID==0)) {
+      #             PycloneOut_Proc_RmvCloneNumbChange <- PycloneOut_Proc_RmvClone %>% dplyr::mutate(cluster_id_Pairtree=cluster_id_Pairtree-1)
+      #       } else if(all(CloneNumb_LowMutID==1)) {
+      #             PycloneOut_Proc_RmvCloneNumbChange <- PycloneOut_Proc_RmvClone
+      #             PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree <- ifelse(PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree==2, 1,
+      #                                                           ifelse(PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree==3, 2, PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree ))
+      #       } else if( all(CloneNumb_LowMutID==2) ) {
+      #             PycloneOut_Proc_RmvCloneNumbChange <- PycloneOut_Proc_RmvClone
+      #             PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree <- ifelse(PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree==3, 2, PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree )
+      #       } else if( all(CloneNumb_LowMutID==c(1,3)) ) {
+      #             PycloneOut_Proc_RmvCloneNumbChange <- PycloneOut_Proc_RmvClone
+      #             PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree <- ifelse(PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree==2, 1, PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree )
+      #       }
+      # 
+      #       table(PycloneOut_Proc_RmvCloneNumbChange$cluster_id_Pairtree)
+      #       # TotalNumbClone_AfRmvClone <- nrow(PycloneOut_Proc_RmvClone); print(TotalNumbClone)
+      #       # CloneNumbDF_RmvClone$ClusterNumb <- c(0:(TotalNumbClone_AfRmvClone-1))
+      # } else {
+      #       PycloneOut_Proc_RmvCloneNumbChange <- PycloneOut_Proc
+      # }
+
+      PycloneOut_Proc_RmvCloneNumbChange <- PycloneOut_Proc
+      
+      #### Checking the existence of MutionSmpID for MYD88
+      PycloneOut_Proc_RmvCloneNumbChange[PycloneOut_Proc_RmvCloneNumbChange$MutationSmpID=="chr1_1187904_CA_C_01_076",] ### <<<<<<<<<<============      ### Careful,  01_076 uses underscore, not dash.
+      grep("chr3_", PycloneOut_Proc_RmvCloneNumbChange$MutationSmpID, value=TRUE)
+      MAFData_IndelSNV_Functional_Proc[MAFData_IndelSNV_Functional_Proc$MutationSmpID=="chr3_38141150_T_C_01_076",]
+
+      #### Checking the existence of MutionSmpID for CXCR4
+      MAFData_IndelSNV_Functional_Proc[grepl("chr3_38141",MAFData_IndelSNV_Functional_Proc$MutationSmpID ),]
+      PycloneOut_Proc_RmvCloneNumbChange[grepl("chr3_381",PycloneOut_Proc_RmvCloneNumbChange$MutationSmpID ),] 
+      
+      PycloneOut_FunctionalIndelSNV <- dplyr::left_join(PycloneOut_Proc_RmvCloneNumbChange[,c("MutationSmpID","cluster_id_Pairtree")],                ##### <<<<<<<<======= left_join
+                                                        MAFData_IndelSNV_Functional_Proc[,c("MutationSmpID","Tumor_Sample_Barcode", "Hugo_Symbol")] )
+      # FullJoinTest <- dplyr::full_join(PycloneOut_Proc_RmvCloneNumbChange[,c("MutationSmpID","cluster_id_Pairtree")],                ##### <<<<<<<<======= full_join
+      #                                  MAFData_IndelSNV_Functional_Proc[,c("MutationSmpID","Tumor_Sample_Barcode", "Hugo_Symbol")] )
+      # table(FullJoinTest$Hugo_Symbol) 
+      # ARID1A  CARD11   CD79B   CXCR4    EZH2    H1-4   KMT2D MAP3K14   MYD88   SP140    TP53 
+      # 4       2       6      13       1       4       2       4      42       3       5 
+      
+      dim(PycloneOut_FunctionalIndelSNV) # 4703 4
+      PycloneOut_FunctionalIndelSNV[grepl("chr3_38141150_T_C_WM22", PycloneOut_FunctionalIndelSNV$MutationSmpID),]
+      
+      #### Checking the existence of MutationSmpID for CD79B
+      MAFData_IndelSNV_Functional_Proc$MutationSmpID[grepl("chr17_639",MAFData_IndelSNV_Functional_Proc$MutationSmpID )] # chr17_63929305___TC_WM85
+      PycloneOut_Proc_RmvCloneNumbChange$MutationSmpID[grepl("chr17_639",PycloneOut_Proc_RmvCloneNumbChange$MutationSmpID )] 
+      
+      print(paste0("FunctionalMutation_ClusterNumber: "))
+      print(table(PycloneOut_FunctionalIndelSNV$cluster_id_Pairtree))
+      ##############     ##############     ##############     ##############
+      ## Step7. Filter the rows that have Hugo_Symbol of mutation genes.  <<<<<<<==================  MutationSmpID_ClusterID_ByFuncMut_All will be used to annotation Mutation gene symbol in TadpoleTail plot 
+      ##############     ##############     ##############     ##############
+      MutationSmpID_ClusterID_ByFuncMut <- PycloneOut_FunctionalIndelSNV %>% dplyr::filter(!is.na(PycloneOut_FunctionalIndelSNV$Hugo_Symbol)); dim(MutationSmpID_ClusterID_ByFuncMut)
+
+      if(LoopCount==1) {
+            MutationSmpID_ClusterID_ByFuncMut_All <- MutationSmpID_ClusterID_ByFuncMut
+      }else if(LoopCount>1) {
+            MutationSmpID_ClusterID_ByFuncMut_All <- dplyr::bind_rows(MutationSmpID_ClusterID_ByFuncMut_All, MutationSmpID_ClusterID_ByFuncMut)  ### This DF is used to make a stacked bar plot and heatmaps.
+      }
+
+      ##############     ##############     ##############     ##############      ##############     ##############     ##############     ##############  ##############
+      ### Compute mean cellular prevalence per cluster per sample
+      ## Cancer Cell Fraction (CCF) # PyClone-VI estimates cellular_prevalence, which is essentially the CCF for each mutation in each sample.
+      ##  When you average cellular_prevalence across mutations within a cluster (same cluster_id_Pairtree), you get the clone-level CCF — i.e., what proportion of tumor cells belong to that clone.
+
+      # CCF (Cancer Cell Fraction) reflects how many tumor cells currently carry a given mutation or clone’s mutations,
+      # not how many cells were in that clone at some earlier time in history.
+      #
+      # So, high CCF ≠ “late, expanded” clone — it usually means that the clone’s mutations are present in nearly all tumor cells today,
+      # i.e. it appeared early and was passed on to all its descendants.
+
+      # Concept	Meaning	Typical pattern
+      # CCF ≈ 1.0	Clone’s mutations are in nearly all tumor cells → founder / ancestral clone	Early
+      # CCF < 1.0	Clone’s mutations are in only a subset of tumor cells → subclone	Later
+      # So, your intuition about “later clones growing more” is biologically sound — but CCF measures inheritance of mutations, not just growth.
+      # That’s why higher CCF = earlier clone in the evolutionary sense, even if lower CCF clones are biologically more aggressive.
+
+      ##############     ##############     ##############     ##############      ##############     ##############     ##############     ##############  ##############
+      mean_ccf_per_cluster <- PycloneOut_Proc_RmvCloneNumbChange %>%  group_by(cluster_id_Pairtree) %>% dplyr::summarize(mean_ccf = mean(cellular_prevalence, na.rm = TRUE),           #  <<<<<<==========. mean_ccf
+              n_mutations = n(),            # optional: number of mutations per cluster
+              .groups = "drop") %>% dplyr::mutate(SampleID=SampleName)
+
+      # View results
+      # print(mean_ccf_per_cluster)
+
+      # # Optional: save to txt file
+      # write.table(mean_ccf_per_cluster, "mean_ccf_per_cluster.txt",  sep="\t", row.names = FALSE, quote = FALSE)
+
+      # print(paste0("Mean CCF cluster IDs after rmv low MutSuppot clones: "))
+      print(mean_ccf_per_cluster[, c("cluster_id_Pairtree", "n_mutations")])
+
+      if(LoopCount==1) {
+            mean_ccf_per_cluster_DF <- mean_ccf_per_cluster
+      }else if(LoopCount>1) {
+            mean_ccf_per_cluster_DF <- dplyr::bind_rows(mean_ccf_per_cluster_DF, mean_ccf_per_cluster)  ### This DF is used to make a stacked bar plot and heatmaps.
+      }
+}
+
+saveRDS(mean_ccf_per_cluster_DF, "ClusterIDPairtree_MeanCCF_SampID.rds") ### This includes the cluster ID with even small number of MuationID support
+
+
+```
+## Step3. Check clone size table, mutation gene per cluster, and Mean CCF
+
+```{r}
+
+####### 1) ClonSizeTableDF ######. <<<<<=========== This doesn't have cluster IDs with small number of MutationID support 
+print(paste0("final loopcount: ", LoopCount)) # 48
+dim(CloneSizeTableDF) # 4 48
+CloneSizeTableDF[is.na(CloneSizeTableDF)] <- "NotAvail"
+
+CloneSizeTable_TP <- CloneSizeTableDF %>% tibble::column_to_rownames("ClusterNumb") %>% t %>% data.frame %>%
+      tibble::rownames_to_column("SampleName"); dim(CloneSizeTable_TP); CloneSizeTable_TP[1:2,] # 47 5
+colnames(CloneSizeTable_TP) <- gsub("X","CloneNumb", colnames(CloneSizeTable_TP))
+CloneSizeTable_TP[1:3,];
+
+data.table::fwrite(CloneSizeTable_TP, file="PycloneVIOut_CloneSizeTable_WM47s_Min10MutID_Prob0.3.txt", col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+saveRDS(CloneSizeTable_TP, file="PycloneVIOut_CloneSizeTable_WM47s_Min10MutID_Prob0.3.rds")
+
+####### 2)  Mutation Gene per cluster                       <<<<<<++++++++++++. The numbere of mutation genes should match the number of genes in Oncolplot (MAF data)
+table(MutationSmpID_ClusterID_ByFuncMut_All$Hugo_Symbol)
+# CARD11   CD79B   CXCR4    EZH2    H1-4   KMT2D MAP3K14   MYD88    TP53 
+#     2       6      13       1       3       1       4      40       2    ### <<<<====  MYD88: 40 (+2 by SpotCheck) 
+
+data.table::fwrite(MutationSmpID_ClusterID_ByFuncMut_All, file="PycloneVIOut_MutationSmpIDClusterID_WM_47s_Prob0.3.txt", col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+saveRDS(MutationSmpID_ClusterID_ByFuncMut_All, file="PycloneVIOut_MutationSmpIDClusterID_WM_47s_Prob0.3.rds")
+
+####### 3)  Mean_CCF: Cancer Cell Fraction (CCF) # PyClone-VI estimates cellular_prevalence, which is essentially the CCF for each mutation in each sample.
+# View(mean_ccf_per_cluster_DF)
+table(mean_ccf_per_cluster_DF$cluster_id_Pairtree, mean_ccf_per_cluster_DF$SampleID); sum(table(mean_ccf_per_cluster_DF$cluster_id_Pairtree, mean_ccf_per_cluster_DF$SampleID)) # 101
+# 01-076 01-115 01-131 01-163 01-190 04-006 WM22 WM26 WM27 WM29 WM30 WM31 WM32 WM33 WM37 WM42 WM43 WM46 WM47 WM48 WM49 WM52 WM54 WM65 WM66 WM67 WM68 WM69 WM70 WM72 WM73 WM74 WM77
+# 0      1      0      1      1      0      1    1    1    1    1    1    1    1    1    1    1    1    0    1    1    1    0    1    1    1    1    1    1    1    1    1    1    1
+# 1      1      1      1      0      1      1    0    1    0    1    1    0    0    1    0    0    1    1    1    0    0    1    1    1    1    1    0    1    1    0    1    1    0
+# 2      0      1      0      1      1      1    0    0    0    0    0    0    0    0    0    0    0    1    1    0    0    0    1    0    0    0    0    0    0    0    0    0    0
+# 3      0      0      0      0      0      0    0    0    0    0    0    0    0    0    0    0    0    1    0    0    0    0    0    0    0    0    0    0    0    0    0    0    0
+#
+# WM8 WM80 WM82 WM83 WM84 WM85 WM86 WM87 WM89 WM9 WM90 WM95 WM96 WM97
+# 0   1    1    1    1    0    1    1    1    1   1    1    1    0    1
+# 1   0    1    1    1    1    0    0    0    0   0    0    0    1    0
+# 2   0    0    0    0    0    0    0    0    0   0    0    0    0    0
+# 3   0    0    0    0    0    0    0    0    0   0    0    0    0    0
+
+data.table::fwrite(mean_ccf_per_cluster_DF, file="PycloneVIOut_MeanCCF_Percluster_WM_47s_Prob0.3.txt", col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+saveRDS(mean_ccf_per_cluster_DF, file="PycloneVIOut_MeanCCF_Percluster_WM_47s_Prob0.3.rds")
+
+```
+
+## Step3. Phylogenetic tree function
+
+```{r}
+PhylogeneticTree <- function( NumbMutData_Proc=NumbMutData_Proc, MySampleID=MySampleID, NodeColor="Color", ChrNumbArm)  {
+      # ---------------------------------------------------------
+      # Extract clone number
+      # ---------------------------------------------------------
+      
+      NumbMutData_Proc <- NumbMutData_Proc %>%
+        mutate( CloneOrder = case_when( str_detect(CloneName,"^x") ~ 0,
+            TRUE ~ as.numeric(str_extract(CloneName,"(?<=Clone)\\d+")) )  ) %>% arrange(CloneOrder)
+      # ---------------------------------------------------------
+      # Scale width using MeanCCF
+      # ---------------------------------------------------------
+      scale_factor <- max(NumbMutData_Proc$MeanCCF)
+      NumbMutData_Proc <- NumbMutData_Proc %>% mutate( width = MeanCCF/scale_factor )
+      
+      # ------------------------------------------------
+      # Manual colors you wanted
+      # ------------------------------------------------
+      
+      colors = c("#FFFF66", "#CFC44AFF", "#99FFFF", "#FF99FF","#008EA0FF")
+      names(colors) <- NumbMutData_Proc$CloneName
+      
+      # ---------------------------------------------------------
+      # Build smooth polygon data
+      # ---------------------------------------------------------
+      
+      make_clone_shape <- function(x_start, x_end, y_center, width, group){
+        data.frame( x=c(x_start,  (x_start+x_end)/2,  x_end,  x_end,   (x_start+x_end)/2,    x_start),
+          y=c(y_center, y_center+width/2, y_center, y_center-width/2, y_center-width/2, y_center ),
+          group=group )
+      }
+      
+      clone_shapes <- data.frame()
+      
+      for(i in 1:nrow(NumbMutData_Proc)){
+        clone_shapes <- rbind(  clone_shapes,   make_clone_shape( x_start=i-1, x_end=i,  y_center=0.3*i,
+            width=NumbMutData_Proc$width[i], group=NumbMutData_Proc$CloneName[i])     )
+      }
+      
+      # ---------------------------------------------------------
+      # Plot
+      # ---------------------------------------------------------
+      
+      TadpoleTailPlot <- ggplot() + ggforce::geom_bspline_closed(
+          data=clone_shapes,
+          aes(x=x,y=y,group=group,fill=group),
+          alpha=0.9 )+
+        
+        geom_text(data=NumbMutData_Proc,
+          aes( x=CloneOrder+0.5, y=0.3*(CloneOrder+1), label=CloneName ), size=2 )+ scale_fill_manual(values = colors) +
+        
+        theme_void()+
+        theme(legend.position="none")+ xlim(-0.5,5)+ ylim(-1,3)
+  
+      ############################ Find MBC or PC subtype for each sample       ############################       ############################
+      WMSubtype <- gsub("G1_|G2_|G3_|_LIKE", "", WMSubtypeData_RmvLowQualityTumor$WMSubtype[WMSubtypeData_RmvLowQualityTumor$Tumor_Sample_Barcode==MySampleID] )
+      if(length(WMSubtype)==0) {
+            WMSubtype <- "Type"
+      }
+      ############################       ############################       ############################       ############################
+      ### Find clone number of Chr6q 
+      if (grepl("WM80|WM83|WM85|WM87",MySampleID) |  !grepl("01_190|WM70|WM33|WM8|WM22|WM27|WM29|WM30|WM32|WM37|WM42|WM43|WM48|WM66|WM68|WM69|WM72|WM73|WM82|WM84|WM86|WM89|WM96",MySampleID ) ){  # 2nd part is Chr1qGain cases
+            OutFileName <- glue(paste0("OutTadpoleTail_",WMSubtype,"_", MySampleID, ".pdf")); print(OutFileName) # glue("{MySampleID}_PhylogeneticTree.pdf")  01_206Test_PhylogeneticTree.pdf 
+      } else { 
+            # OutFileName <- glue(paste0("OutTadpoleTail_",WMSubtype,"_", MySampleID, "_Chr6qLoss.pdf")); print(OutFileName) # glue("{MySampleID}_PhylogeneticTree.pdf")  01_206Test_PhylogeneticTree.pdf
+            OutFileName <- glue(paste0("OutTadpoleTail_",WMSubtype,"_", MySampleID, "_", ChrNumbArm,  ".pdf")); print(OutFileName) # glue("{MySampleID}_PhylogeneticTree.pdf")  01_206Test_PhylogeneticTree.pdf
+      }
+      
+      # if(grepl("WM33|WM49|WM32|WM72|WM43|WM26|WM27|WM8_|WM90|WM86|WM87", MySampleID) | MySampleID=="WM8") {
+      #       OutFileName <- glue(paste0("OutTadpoleTail_",WMSubtype,"_", MySampleID, "_Chr1qGain.pdf")); print(OutFileName) 
+      # }
+      
+      # ggsave(plot=gg1, file=glue(paste0("{out_dir}/",PtNumb,"_{s}_inferCNVphylo.pdf")), width=10, height=8, units="in")
+      ggsave(plot=TadpoleTailPlot, file=OutFileName, width=3, height=2.5, units="in")
+
+      print(paste0("this s is done: ", MySampleID))
+      # }
+}
+
+
+```
+
+## Step4. ClusterID for maximum number of MutationIDs for chr6q loss in 20 samples
+I made this data from "Step1_Map_FACETS_PycloneInput_FindChr6qLoss.R"
+
+```{r}
+##### Chr1q Gain 
+ClusterID_NumberMutation_AllChr1q <- readRDS(paste0(dir, "/", ClusterID_NumberMutation_AllChr1qFile)); ClusterID_NumberMutation_AllChr1q[1:2,]; dim(ClusterID_NumberMutation_AllChr1q) # 3 12 
+
+ClusterID_NumberMutation_AllChr1q$ClusterID <- paste0("Clone", ClusterID_NumberMutation_AllChr1q$ClusterID); ClusterID_NumberMutation_AllChr1q[1:2,]
+ClusterID_NumberMutation_AllChr1q[is.na(ClusterID_NumberMutation_AllChr1q)] <- "0_0" 
+
+##### Chr6q Loss 
+ClusterID_NumberMutation_AllChr6q <- readRDS(ClusterID_NumberMutation_AllChr6qFile); ClusterID_NumberMutation_AllChr6q[1:2,]
+# ClusterID_NumberMutation_AllChr6q_Tp <- ClusterID_NumberMutation_AllChr6q %>% tibble::column_to_rownames("ClusterID") %>% t %>% data.frame
+
+ClusterID_NumberMutation_AllChr6q$ClusterID <- paste0("Clone", ClusterID_NumberMutation_AllChr6q$ClusterID); ClusterID_NumberMutation_AllChr6q[1:2,]
+ClusterID_NumberMutation_AllChr6q[is.na(ClusterID_NumberMutation_AllChr6q)] <- "0_0" 
+```
+
+## Step5. Adjust clone evolution number by Mean_CCF and make dataframe for PhylogeneticTree()
+
+```{r}
+
+Func_PairtreePhylogenicTree <- function(GroupSampleID, Chr1q6qNote="Yes" ,  ClusterID_NumberMutation_AllChr1q6q, ChrNumbArm) {    
+        CloneNumbMeanCCFMutationNumber_DF_AllSmp <- data.frame(); LoopNumb<-0;
+        for (EachSampleID in GroupSampleID) {
+              LoopNumb <- LoopNumb+1; print(paste0("current loop numb: ", LoopNumb))
+              # EachSampleID <- Chr1qGainSampleID[13]; #  GroupSampleID[5];  ## I should solve # One clone: WM30, WM8, WM84, WM86, WM87, WM89    # Two clones: WM43, ## 41 is WM86
+              print(paste0("Each sample ID: ", EachSampleID)) # 01-076
+              
+              MeanCCFClusterID_Subset <- mean_ccf_per_cluster_DF %>% dplyr::filter(SampleID==EachSampleID); dim(MeanCCFClusterID_Subset) ; table(MeanCCFClusterID_Subset$cluster_id_Pairtree)# 5 4
+              #       cluster_id_Pairtree mean_ccf n_mutations SampleID
+              #           <dbl>    <dbl>     <int> <chr>
+              # 1          0      0.313        2294 01-076
+              # 2          1      0.808        3042 01-076
+              #### Skip if the number of node is 1.
+              # if(nrow(MeanCCFClusterID_Subset)==1) {
+              #       # next;
+              # }
+        
+              ### +++ Remove cluster with 'n_mutations' < 10
+              MeanCCFClusterID_Subset <- MeanCCFClusterID_Subset %>% dplyr::filter(n_mutations>=10); dim(MeanCCFClusterID_Subset) # 4 4
+              
+              ### +++ Check the clone evolution order
+              SizeCluster <- nrow(MeanCCFClusterID_Subset); print(paste0("Size of cluster: ", SizeCluster)) # 2
+        
+              # for(i in seq(0, (SizeCluster)-1, by=1 ) ) {
+                    # i <- 0
+                    # print(paste0("Current i: ", i))
+        
+                    ### if-else by SizeCluster     <<<<===== If I deleted a cluster by "n_mutations>=10" I should handle it here
+                    if(SizeCluster==1) {  
+                          # if(EachSampleID %in% c("WM29", "WM77","WM84","WM85", "WM86","WM87","WM89","WM90"))  {    
+                          #         MeanCCF0 <- MeanCCFClusterID_Subset$mean_ccf[MeanCCFClusterID_Subset$cluster_id_Pairtree==1]; print(paste0("MeanCCF0: ", MeanCCF0))
+                          # } else {
+                                  MeanCCF0 <- MeanCCFClusterID_Subset$mean_ccf[MeanCCFClusterID_Subset$cluster_id_Pairtree==0]; print(paste0("MeanCCF0: ", MeanCCF0))
+                          # }
+                                  
+                          ClusterID_ByMeanCCF <- MeanCCFClusterID_Subset$cluster_id_Pairtree[MeanCCFClusterID_Subset$mean_ccf==MeanCCF0]; print(paste0("current ClusterID_ByMeanCCF: ", ClusterID_ByMeanCCF)) # 1
+        
+                          ### Find Mutation Number for clone evolution order.
+                          NumbMutation_ClusterID_ByMeanCCF <- MeanCCFClusterID_Subset$n_mutations[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMeanCCF]
+                          print(paste0("NumbMutation_ClusterID_ByMeanCCF: ", NumbMutation_ClusterID_ByMeanCCF)) # 4883
+        
+                          #### Make a data.frame to summarize  Mutation number in each clone. 
+                          MutationNumber_DF <- data.frame("SmpID"= EachSampleID, "MutNumb"=c(NumbMutation_ClusterID_ByMeanCCF), "CloneNumb"=c("Clone1"))
+                          
+                          ### Find Mean_CCF for clone evolution order.
+                          MeanCCF_ClusterID_ByMeanCCF <- MeanCCFClusterID_Subset$mean_ccf[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMeanCCF]
+                          print(paste0("MeanCCF_ClusterID_ByMeanCCF: ", MeanCCF_ClusterID_ByMeanCCF)) # 23
+        
+                          ### Find "MutGene" for clone evolution order.
+                          MutGene_ClusterID_ByMeanCCF <- MutationSmpID_ClusterID_ByFuncMut_All$Hugo_Symbol[MutationSmpID_ClusterID_ByFuncMut_All$cluster_id_Pairtree==ClusterID_ByMeanCCF &
+                                                             MutationSmpID_ClusterID_ByFuncMut_All$Tumor_Sample_Barcode==gsub("-", "_", EachSampleID) ]
+                          MutGene_ClusterID_ByMeanCCF <- paste(MutGene_ClusterID_ByMeanCCF, collapse="_")
+                          if(MutGene_ClusterID_ByMeanCCF=="" ) {MutGene_ClusterID_ByMeanCCF <- "NoMut"}
+                          print(paste0("MutGene_ClusterID_ByMeanCCF: ", MutGene_ClusterID_ByMeanCCF)) #
+        
+                          ####################################################################################################################################
+                          # # #### Method1: Number of Mutation for node size
+                          # NumbMutData <- data.frame("sample"=c(rep(gsub("-", "_", EachSampleID),SizeCluster+1)), #name of sample, useful to read in all samples at once if processing multiple
+                          #                           "CloneName" = c("x", paste0("Clone", seq_len(nrow(MeanCCFClusterID_Subset))) ), #Clone
+                          #                           "MeanCCF"= c(0, NumbMutation_ClusterID_ByMeanCCF)  ) #number of cells in Clone
+                          # #### Make a long CloneName: "Clone1_MutNumb_CCF_MutGene"
+                          # NumbMutData_Proc <- NumbMutData %>% dplyr::mutate(CloneName=paste0(NumbMutData$CloneName,"_",NumbMutData$MeanCCF,"_", c(0, MeanCCF_ClusterID_ByMeanCCF),
+                          #                                                               "_",c("NoMut", MutGene_ClusterID_ByMeanCCF)))
+                          #### Method2: MeanCCF will be  node size.
+                          NumbMutData <- data.frame("sample"=c(rep(gsub("-", "_", EachSampleID),SizeCluster+1)), #name of sample, useful to read in all samples at once if processing multiple
+                                                    "CloneName" = c("x", paste0("Clone", seq_len(nrow(MeanCCFClusterID_Subset))) ), #Clone
+                                                    "MeanCCF"= c(20, MeanCCF_ClusterID_ByMeanCCF*1e2)  ) #number of cells in Clone
+                          #### Make a long CloneName: "Clone1_MutNumb_CCF_MutGene"
+                          NumbMutData_Proc <- NumbMutData %>% dplyr::mutate(CloneName=paste0(NumbMutData$CloneName,"_",c(0, NumbMutation_ClusterID_ByMeanCCF),"_",
+                                                               c(0, MeanCCF_ClusterID_ByMeanCCF), "_",c("NoMut", MutGene_ClusterID_ByMeanCCF)))
+        
+                          ####################################################################################################################################
+                    } else if (SizeCluster==2) {
+                          ## Find min or max mutation number
+                          MeanCCF_Min <- min(MeanCCFClusterID_Subset$mean_ccf); print(paste0("Min MeanCCF: ", MeanCCF_Min)) # 0.3131"
+                          MeanCCF_Max <- max(MeanCCFClusterID_Subset$mean_ccf); print(paste0("Max MeanCCF: ", MeanCCF_Max)) # 0.8082"
+        
+                          if (MeanCCF_Min==MeanCCF_Max) {
+        
+                          } else if (MeanCCF_Min!=MeanCCF_Max) {
+                                ## checking cluster number by min/max mutation number
+                                ClusterID_ByMaxMeanCCF <- MeanCCFClusterID_Subset$cluster_id_Pairtree[MeanCCFClusterID_Subset$mean_ccf==MeanCCF_Max]; print(paste0("current ClusterID_ByMaxMeanCCF: ", ClusterID_ByMaxMeanCCF)) # 1
+                                ClusterID_ByMinMeanCCF <- MeanCCFClusterID_Subset$cluster_id_Pairtree[MeanCCFClusterID_Subset$mean_ccf==MeanCCF_Min]; print(paste0("current ClusterID_ByMinMeanCCF: ", ClusterID_ByMinMeanCCF)) # 0
+        
+                                if(ClusterID_ByMaxMeanCCF < ClusterID_ByMinMeanCCF) {
+                                     # print("it has already correct cluster evolution ID")
+        
+                                } else if(ClusterID_ByMaxMeanCCF > ClusterID_ByMinMeanCCF) {
+                                    #  print("it has reversed cluster evolution ID")
+                                }
+                          }
+        
+                          ### Find Mutation Number for clone evolution order.
+                          NumbMutation_ClusterID_ByMaxMeanCCF <- MeanCCFClusterID_Subset$n_mutations[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMaxMeanCCF]
+                          print(paste0("NumbMutation_ClusterID_ByMaxMeanCCF: ", NumbMutation_ClusterID_ByMaxMeanCCF)) # 3042
+        
+                          NumbMutation_ClusterID_ByMinMeanCCF <- MeanCCFClusterID_Subset$n_mutations[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMinMeanCCF]
+                          print(paste0("NumbMutation_ClusterID_ByMinMeanCCF: ", NumbMutation_ClusterID_ByMinMeanCCF)) # 2294
+        
+                          #### Make a data.frame to summarize  Mutation number in each clone. 
+                          MutationNumber_DF <- data.frame("SmpID"= EachSampleID, "MutNumb"=c(NumbMutation_ClusterID_ByMaxMeanCCF,NumbMutation_ClusterID_ByMinMeanCCF), 
+                                                          "CloneNumb"=c("Clone1","Clone2"))
+                          
+                          ### Find Mean_CCF for clone evolution order.
+                          MeanCCF_ClusterID_ByMaxMeanCCF <- MeanCCFClusterID_Subset$mean_ccf[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMaxMeanCCF]
+                          print(paste0("MeanCCF_ClusterID_ByMaxMeanCCF: ", MeanCCF_ClusterID_ByMaxMeanCCF)) # 23
+        
+                          MeanCCF_ClusterID_ByMinMeanCCF <- MeanCCFClusterID_Subset$mean_ccf[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMinMeanCCF]
+                          print(paste0("MeanCCF_ClusterID_ByMinMeanCCF: ", MeanCCF_ClusterID_ByMinMeanCCF)) # 2784
+        
+                          ### Find "MutGene" for clone evolution order.
+                          MutGene_ClusterID_ByMaxMeanCCF <- MutationSmpID_ClusterID_ByFuncMut_All$Hugo_Symbol[MutationSmpID_ClusterID_ByFuncMut_All$cluster_id_Pairtree==ClusterID_ByMaxMeanCCF &
+                                                             MutationSmpID_ClusterID_ByFuncMut_All$Tumor_Sample_Barcode==gsub("-", "_", EachSampleID) ]
+                          MutGene_ClusterID_ByMaxMeanCCF <- paste(MutGene_ClusterID_ByMaxMeanCCF, collapse="_")
+                          if(MutGene_ClusterID_ByMaxMeanCCF=="" ) {MutGene_ClusterID_ByMaxMeanCCF <- "NoMut"}
+                          print(paste0("MutGene_ClusterID_ByMaxMeanCCF: ", MutGene_ClusterID_ByMaxMeanCCF)) #
+        
+                          MutGene_ClusterID_ByMinMeanCCF <- MutationSmpID_ClusterID_ByFuncMut_All$Hugo_Symbol[MutationSmpID_ClusterID_ByFuncMut_All$cluster_id_Pairtree==ClusterID_ByMinMeanCCF &
+                                                            MutationSmpID_ClusterID_ByFuncMut_All$Tumor_Sample_Barcode==gsub("-", "_", EachSampleID)]
+                          MutGene_ClusterID_ByMinMeanCCF <- paste(MutGene_ClusterID_ByMinMeanCCF, collapse="_")
+                          if(MutGene_ClusterID_ByMinMeanCCF=="" ) {MutGene_ClusterID_ByMinMeanCCF <- "NoMut"}
+                          print(paste0("MutGene_ClusterID_ByMinMeanCCF: ", MutGene_ClusterID_ByMinMeanCCF)) #
+        
+                          ####################################################################################################################################
+                          # #### Method1: Number of Mutation for node size
+                          # NumbMutData <- data.frame("sample"=c(rep(gsub("-", "_", EachSampleID),SizeCluster+1)), #name of sample, useful to read in all samples at once if processing multiple
+                          #                           "CloneName" = c("x", paste0("Clone", seq_len(nrow(MeanCCFClusterID_Subset))) ), #Clone
+                          #                           "MeanCCF"= c(0, NumbMutation_ClusterID_ByMaxMeanCCF, NumbMutation_ClusterID_ByMinMeanCCF)  ) #number of cells in Clone
+                          # #### Make a long CloneName: "Clone1_MutNumb_CCF_MutGene"
+                          # NumbMutData_Proc <- NumbMutData %>% dplyr::mutate(CloneName=paste0(NumbMutData$CloneName,"_",NumbMutData$counts,"_", c(0, MeanCCF_ClusterID_ByMaxMeanCCF, MeanCCF_ClusterID_ByMinMeanCCF),
+                          #                                                               "_",c("NoMut", MutGene_ClusterID_ByMaxMeanCCF, MutGene_ClusterID_ByMinMeanCCF)))
+        
+                          #### Method2: MeanCCF will be node size.
+                          NumbMutData <- data.frame("sample"=c(rep(gsub("-", "_", EachSampleID),SizeCluster+1)), #name of sample, useful to read in all samples at once if processing multiple
+                                                    "CloneName" = c("x", paste0("Clone", seq_len(nrow(MeanCCFClusterID_Subset))) ), #Clone
+                                                    "MeanCCF"= c(20, MeanCCF_ClusterID_ByMaxMeanCCF*1e3, MeanCCF_ClusterID_ByMinMeanCCF*1e3)  ) #number of cells in Clone
+        
+                          #### Make a long CloneName: "Clone1_MutNumb_CCF_MutGene"
+                          NumbMutData_Proc <- NumbMutData %>% dplyr::mutate(CloneName=paste0(NumbMutData$CloneName,"_",c(0, NumbMutation_ClusterID_ByMaxMeanCCF, NumbMutation_ClusterID_ByMinMeanCCF),"_",
+                                                                    c(0, MeanCCF_ClusterID_ByMaxMeanCCF, MeanCCF_ClusterID_ByMinMeanCCF),
+                                               "_",c("NoMut", MutGene_ClusterID_ByMaxMeanCCF, MutGene_ClusterID_ByMinMeanCCF)))
+                          print(paste0("first made for ", EachSampleID ,": ",  NumbMutData_Proc$CloneName[3] ))
+                          ####################################################################################################################################
+                    } else if (SizeCluster>=3) {
+                          #     cluster_id_Pairtree mean_ccf n_mutations SampleID
+                          #         <dbl>    <dbl>       <int> <chr>
+                          # 1          0    0.989          23 01-115
+                          # 2          1    0.323        2784 01-115
+                          # 3          2    0.727        3546 01-115
+        
+                          ## Find min or max mutation number
+                          MeanCCF_Min <- min(MeanCCFClusterID_Subset$mean_ccf); print(paste0("Min MeanCCF: ", MeanCCF_Min)) # 0.3233
+                          MeanCCF_SecondMax <-sort(MeanCCFClusterID_Subset$mean_ccf, decreasing = TRUE)[2]; print(paste0("second max MeanCCF: ", MeanCCF_SecondMax)) # 0.727
+                          ## MeanCCF_ThirdMax  ## <<<<=====  See below line 701
+                          MeanCCF_Max <- max(MeanCCFClusterID_Subset$mean_ccf); print(paste0("Max MeanCCF: ", MeanCCF_Max)) # 0.9886
+        
+                          ## checking cluster number by min/max mutation number
+                          ClusterID_ByMaxMeanCCF <- MeanCCFClusterID_Subset$cluster_id_Pairtree[MeanCCFClusterID_Subset$mean_ccf==MeanCCF_Max]; print(paste0("current ClusterID_ByMaxMeanCCF: ", ClusterID_ByMaxMeanCCF)) # 0
+                          ClusterID_BySecMaxMeanCCF <- MeanCCFClusterID_Subset$cluster_id_Pairtree[MeanCCFClusterID_Subset$mean_ccf==MeanCCF_SecondMax]; print(paste0("current ClusterID_BySecMaxMeanCCF: ", ClusterID_BySecMaxMeanCCF)) # 2
+                          ClusterID_ByMinMeanCCF <- MeanCCFClusterID_Subset$cluster_id_Pairtree[MeanCCFClusterID_Subset$mean_ccf==MeanCCF_Min]; print(paste0("current ClusterID_ByMinMeanCCF: ", ClusterID_ByMinMeanCCF)) # 1
+        
+                          ### Find Mutation Number for clone evolution order.
+                          NumbMutation_ClusterID_ByMaxMeanCCF <- MeanCCFClusterID_Subset$n_mutations[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMaxMeanCCF]
+                          print(paste0("NumbMutation_ClusterID_ByMaxMeanCCF: ", NumbMutation_ClusterID_ByMaxMeanCCF)) # 23
+        
+                          NumbMutation_ClusterID_BySecMaxMeanCCF <- MeanCCFClusterID_Subset$n_mutations[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_BySecMaxMeanCCF]
+                          print(paste0("NumbMutation_ClusterID_BySecMaxMeanCCF: ", NumbMutation_ClusterID_BySecMaxMeanCCF)) # 3546
+        
+                          NumbMutation_ClusterID_ByMinMeanCCF <- MeanCCFClusterID_Subset$n_mutations[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMinMeanCCF]
+                          print(paste0("NumbMutation_ClusterID_ByMinMeanCCF: ", NumbMutation_ClusterID_ByMinMeanCCF)) # 2784
+        
+                          #### Make a data.frame to summarize  Mutation number in each clone. 
+                          if(SizeCluster==3) {
+                                MutationNumber_DF <- data.frame("SmpID"= EachSampleID, "MutNumb"=c(NumbMutation_ClusterID_ByMaxMeanCCF,NumbMutation_ClusterID_BySecMaxMeanCCF,NumbMutation_ClusterID_ByMinMeanCCF), 
+                                                          "CloneNumb"=c("Clone1","Clone2","Clone3"))
+                          } else if (SizeCluster==4) {
+                                MeanCCF_ThirdMax <-sort(MeanCCFClusterID_Subset$mean_ccf, decreasing = TRUE)[3]; print(paste0("third max MeanCCF: ", MeanCCF_ThirdMax)) # 0.708
+                                ClusterID_ByThirdMaxMeanCCF <- MeanCCFClusterID_Subset$cluster_id_Pairtree[MeanCCFClusterID_Subset$mean_ccf==MeanCCF_ThirdMax]; print(paste0("current ClusterID_ByThirdMaxMeanCCF: ", ClusterID_ByThirdMaxMeanCCF)) # 2
+                                NumbMutation_ClusterID_ByThirdMaxMeanCCF <- MeanCCFClusterID_Subset$n_mutations[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByThirdMaxMeanCCF]
+                                
+                                MutationNumber_DF <- data.frame("SmpID"= EachSampleID, "MutNumb"=c(NumbMutation_ClusterID_ByMaxMeanCCF,NumbMutation_ClusterID_BySecMaxMeanCCF, NumbMutation_ClusterID_ByThirdMaxMeanCCF, NumbMutation_ClusterID_ByMinMeanCCF), 
+                                                            "CloneNumb"=c("Clone1","Clone2","Clone3", "Clone4"))
+                          }
+                                
+                          ### Find Mean_CCF for clone evolution order.
+                          MeanCCF_ClusterID_ByMaxMeanCCF <- MeanCCFClusterID_Subset$mean_ccf[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMaxMeanCCF]
+                          print(paste0("MeanCCF_ClusterID_ByMaxMeanCCF: ", MeanCCF_ClusterID_ByMaxMeanCCF)) # 23
+        
+                          MeanCCF_ClusterID_BySecMaxMeanCCF <- MeanCCFClusterID_Subset$mean_ccf[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_BySecMaxMeanCCF]
+                          print(paste0("MeanCCF_ClusterID_BySecMaxMeanCCF: ", MeanCCF_ClusterID_BySecMaxMeanCCF)) # 3546
+        
+                          if (SizeCluster==4) {
+                                MeanCCF_ClusterID_ByThirdMaxMeanCCF <- MeanCCFClusterID_Subset$mean_ccf[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByThirdMaxMeanCCF]
+                                print(paste0("MeanCCF_ClusterID_ByThirdMaxMeanCCF: ", MeanCCF_ClusterID_ByThirdMaxMeanCCF)) # 3546
+                          }
+                          
+                          MeanCCF_ClusterID_ByMinMeanCCF <- MeanCCFClusterID_Subset$mean_ccf[MeanCCFClusterID_Subset$cluster_id_Pairtree==ClusterID_ByMinMeanCCF]
+                          print(paste0("MeanCCF_ClusterID_ByMinMeanCCF: ", MeanCCF_ClusterID_ByMinMeanCCF)) # 2784
+        
+                          ### Find "MutGene" for clone evolution order.
+                          # 1) MaxMeanCCF cluster
+                          MutGene_ClusterID_ByMaxMeanCCF <- MutationSmpID_ClusterID_ByFuncMut_All$Hugo_Symbol[MutationSmpID_ClusterID_ByFuncMut_All$cluster_id_Pairtree==ClusterID_ByMaxMeanCCF &
+                                                                               MutationSmpID_ClusterID_ByFuncMut_All$Tumor_Sample_Barcode==gsub("-", "_", EachSampleID) ]   # [1] "CD79B" "MYD88"
+                          MutGene_ClusterID_ByMaxMeanCCF <- paste(MutGene_ClusterID_ByMaxMeanCCF, collapse="_")
+                          if(MutGene_ClusterID_ByMaxMeanCCF=="" ) {MutGene_ClusterID_ByMaxMeanCCF <- "NoMut"}
+                          print(paste0("MutGene_ClusterID_ByMaxMeanCCF: ", MutGene_ClusterID_ByMaxMeanCCF)) #
+        
+                          # 2) SecMaxMeanCCF cluster
+                          MutGene_ClusterID_BySecMaxMeanCCF <- MutationSmpID_ClusterID_ByFuncMut_All$Hugo_Symbol[MutationSmpID_ClusterID_ByFuncMut_All$cluster_id_Pairtree==ClusterID_BySecMaxMeanCCF  &
+                                                                                 MutationSmpID_ClusterID_ByFuncMut_All$Tumor_Sample_Barcode==gsub("-", "_", EachSampleID)]
+                          MutGene_ClusterID_BySecMaxMeanCCF <- paste(MutGene_ClusterID_BySecMaxMeanCCF, collapse="_")
+                          if(MutGene_ClusterID_BySecMaxMeanCCF=="" ) {MutGene_ClusterID_BySecMaxMeanCCF <- "NoMut"}
+                          print(paste0("MutGene_ClusterID_BySecMaxMeanCCF: ", MutGene_ClusterID_BySecMaxMeanCCF)) #
+        
+                          # 3) ThirdMeanCCF cluster
+                          if (SizeCluster==4) {
+                                MutGene_ClusterID_ByThirdMaxMeanCCF <- MutationSmpID_ClusterID_ByFuncMut_All$Hugo_Symbol[MutationSmpID_ClusterID_ByFuncMut_All$cluster_id_Pairtree==ClusterID_ByThirdMaxMeanCCF  &
+                                                                                                                           MutationSmpID_ClusterID_ByFuncMut_All$Tumor_Sample_Barcode==gsub("-", "_", EachSampleID)]
+                                MutGene_ClusterID_ByThirdMaxMeanCCF <- paste(MutGene_ClusterID_ByThirdMaxMeanCCF, collapse="_")
+                                if(MutGene_ClusterID_ByThirdMaxMeanCCF=="" ) {MutGene_ClusterID_ByThirdMaxMeanCCF <- "NoMut"}
+                                print(paste0("MutGene_ClusterID_ByThirdMaxMeanCCF: ", MutGene_ClusterID_ByThirdMaxMeanCCF)) #
+                          }
+                          
+                          # 4) MinMeanCCF cluster
+                          MutGene_ClusterID_ByMinMeanCCF <- MutationSmpID_ClusterID_ByFuncMut_All$Hugo_Symbol[MutationSmpID_ClusterID_ByFuncMut_All$cluster_id_Pairtree==ClusterID_ByMinMeanCCF &
+                                                                              MutationSmpID_ClusterID_ByFuncMut_All$Tumor_Sample_Barcode==gsub("-", "_", EachSampleID)]
+                          MutGene_ClusterID_ByMinMeanCCF <- paste(MutGene_ClusterID_ByMinMeanCCF, collapse="_")
+                          if(MutGene_ClusterID_ByMinMeanCCF=="" ) {MutGene_ClusterID_ByMinMeanCCF <- "NoMut"}
+                          print(paste0("MutGene_ClusterID_ByMinMeanCCF: ", MutGene_ClusterID_ByMinMeanCCF)) #
+        
+                          ####################################################################################################################################
+                          # # #### 1) Method1. Number of Mutation for node size
+                          # NumbMutData <- data.frame("sample"=c(rep(gsub("-", "_", EachSampleID),SizeCluster+1)), #name of sample, useful to read in all samples at once if processing multiple
+                          #                           "CloneName" = c("x", paste0("Clone", seq_len(nrow(MeanCCFClusterID_Subset))) ), #Clone
+                          #                           "MeanCCF"= c(0, NumbMutation_ClusterID_ByMaxMeanCCF, NumbMutation_ClusterID_BySecMaxMeanCCF,NumbMutation_ClusterID_ByMinMeanCCF)  ) #number of cells in Clone
+                          # #### Make a long CloneName: "Clone1_MutNumb_CCF_MutGene"
+                          # NumbMutData_Proc <- NumbMutData %>% dplyr::mutate(CloneName=paste0(NumbMutData$CloneName,"_",NumbMutData$counts,"_", c(0, MeanCCF_ClusterID_ByMaxMeanCCF, MeanCCF_ClusterID_BySecMaxMeanCCF, MeanCCF_ClusterID_ByMinMeanCCF),
+                          #                                           "_",c("NoMut", MutGene_ClusterID_ByMaxMeanCCF, MutGene_ClusterID_BySecMaxMeanCCF, MutGene_ClusterID_ByMinMeanCCF)))
+        
+                          if (SizeCluster==3) {
+                                #### Method2: MeanCCF will be node size.   ###  <<<<<===== SizeCluster==3
+                                NumbMutData <- data.frame("sample"=c(rep(gsub("-", "_", EachSampleID),SizeCluster+1)), #name of sample, useful to read in all samples at once if processing multiple
+                                                          "CloneName" = c("x", paste0("Clone", seq_len(nrow(MeanCCFClusterID_Subset))) ), #Clone
+                                                          "MeanCCF"= c(20, MeanCCF_ClusterID_ByMaxMeanCCF*1e3,MeanCCF_ClusterID_BySecMaxMeanCCF*1e3, MeanCCF_ClusterID_ByMinMeanCCF*1e3)  ) #number of cells in Clone
+                                
+                                #### Make a long CloneName: "Clone1_MutNumb_CCF_MutGene"
+                                NumbMutData_Proc <- NumbMutData %>% dplyr::mutate(CloneName=paste0(NumbMutData$CloneName,"_",c(0, NumbMutation_ClusterID_ByMaxMeanCCF,NumbMutation_ClusterID_BySecMaxMeanCCF, NumbMutation_ClusterID_ByMinMeanCCF),"_",
+                                                                                                   c(0, MeanCCF_ClusterID_ByMaxMeanCCF,MeanCCF_ClusterID_BySecMaxMeanCCF, MeanCCF_ClusterID_ByMinMeanCCF),
+                                                                                                   "_",c("NoMut", MutGene_ClusterID_ByMaxMeanCCF, MutGene_ClusterID_BySecMaxMeanCCF, MutGene_ClusterID_ByMinMeanCCF)))
+                          } else if (SizeCluster==4) {
+                                #### Method2: CCF will be 'MeanCCF' for node size.   ###  <<<<<===== SizeCluster==4
+                                NumbMutData <- data.frame("sample"=c(rep(gsub("-", "_", EachSampleID),SizeCluster+1)), #name of sample, useful to read in all samples at once if processing multiple
+                                                      "CloneName" = c("x", paste0("Clone", seq_len(nrow(MeanCCFClusterID_Subset))) ), #Clone
+                                                      "MeanCCF"= c(20, MeanCCF_ClusterID_ByMaxMeanCCF*1e3,MeanCCF_ClusterID_BySecMaxMeanCCF*1e3, MeanCCF_ClusterID_ByThirdMaxMeanCCF*1e3, MeanCCF_ClusterID_ByMinMeanCCF*1e3)  ) #number of cells in Clone
+                               
+                                #### Make a long CloneName: "Clone1_MutNumb_CCF_MutGene"
+                                NumbMutData_Proc <- NumbMutData %>% dplyr::mutate(CloneName=paste0(NumbMutData$CloneName,"_",c(0, NumbMutation_ClusterID_ByMaxMeanCCF,NumbMutation_ClusterID_BySecMaxMeanCCF,NumbMutation_ClusterID_ByThirdMaxMeanCCF, NumbMutation_ClusterID_ByMinMeanCCF),"_",
+                                                                                                   c(0, MeanCCF_ClusterID_ByMaxMeanCCF,MeanCCF_ClusterID_BySecMaxMeanCCF,MeanCCF_ClusterID_ByThirdMaxMeanCCF, MeanCCF_ClusterID_ByMinMeanCCF ),
+                                                                                                   "_",c("NoMut", MutGene_ClusterID_ByMaxMeanCCF, MutGene_ClusterID_BySecMaxMeanCCF,MutGene_ClusterID_ByThirdMaxMeanCCF, MutGene_ClusterID_ByMinMeanCCF)))
+                          }
+                          
+                       
+                          
+                          ####################################################################################################################################
+        
+                    }
+                    ###### data.frame that summarize Mean_CCF, MutationGene and the number of mutations in each clone for all samples. 
+                    NumbMutData_Proc_CloneNumb <- NumbMutData_Proc %>% dplyr::mutate(CloneNumb=gsub("_(.*)","",  CloneName))
+                    CloneNumbMeanCCFMutationNumber_DF_AllSmp <- dplyr::bind_rows(CloneNumbMeanCCFMutationNumber_DF_AllSmp, dplyr::inner_join(NumbMutData_Proc_CloneNumb, MutationNumber_DF)   ) 
+              
+                    # ### Create phylogenetic tree  - soft code regardless of SizeCluster
+                    TreeDataFrame <- data.frame("sample"= c(rep(gsub("-", "_", EachSampleID),SizeCluster)), "from"= c("x", paste0("Clone", seq_len(nrow(MeanCCFClusterID_Subset)-1)) ),
+                                            "to"=c(paste0("Clone", seq_len(nrow(MeanCCFClusterID_Subset))))         )
+        
+                    ### Create phylogenetic tree  - soft code regardless of SizeCluster; Clone Name: "Clone1_MutNumb_CCF_MutGene"
+                    TreeDataFrame_Proc <- data.frame("sample"=c(rep(gsub("-", "_", EachSampleID),SizeCluster)), "from"= NumbMutData_Proc$CloneName[1:(nrow(NumbMutData_Proc)-1) ] ,
+                                                "to"=NumbMutData_Proc$CloneName[2:nrow(NumbMutData_Proc) ]       ) ; print(TreeDataFrame_Proc)
+                    #   sample                      from                        to
+                    # 1   WM96               x_0_0_NoMut Clone1_15100_0.5657_MYD88
+                    # 2   WM96 Clone1_15100_0.5657_MYD88       Clone2_1434_0_NoMut
+                 
+                    ################################### #################################### ############################ ############################ ############################ ############################ 
+                    ################################### #################################### ############################ ############################ ############################ ############################ 
+                    if(Chr1q6qNote=="Yes") {
+                              ################################### #################################### ############################ 
+                              ########################### Add Chr6q Loss information to the node ##################################
+                              ################################### #################################### ############################ 
+                              if(ChrNumbArm == "Chr1qGain") {
+                                      ### Find clone number of Chr1q
+                                      if (grepl("WM80|WM82|WM83|WM84|WM85|WM89",EachSampleID)){ 
+                                              next 
+                                      } else if(!grepl("WM33|WM49|WM32|WM72|WM43|WM26|WM27|WM29|WM8_|WM90|WM86|WM87", EachSampleID)) {  ### <<<<<===== These have Chr1q Gain
+                                              next 
+                                      }
+                              } else if (ChrNumbArm=="Chr6qLoss"){ 
+                                      ### Find clone number of Chr6q
+                                      if (grepl("WM80|WM83|WM85|WM87",EachSampleID)){
+                                            next
+                                      } else if (!grepl("01-190|WM70|WM33|WM8|WM22|WM30|WM32|WM37|WM42|WM43|WM48|WM66|WM68|WM69|WM73|WM82|WM84|WM86|WM89|WM96",EachSampleID )) {     ##### <<<<<<=== These have Chr6q Loss
+                                            ## MBC-like: 01-190, WM70, WM33 (n=3)   ## PC-like: WM8_|WM22|WM30|WM32|WM37|WM42|WM43|WM48|WM66|WM68|WM69|WM73| (n=12)
+                                            ## NotAvail: WM82|WM84|WM86|WM89|WM96 (n=5)
+                                            ### 3 clones: 01-190          # 2 clones: WM43 (PC),  WM82, WM84, WM96    Check WM8, WM73,WM86, WM89
+                                            next
+                                      }
+                              }
+                              print(ClusterID_NumberMutation_AllChr1q6q[, grepl(paste0(EachSampleID,"$"), colnames(ClusterID_NumberMutation_AllChr1q6q)) ])
+                              
+                              ### find count MutID of Chr6q and count total MutID
+                              CountChr6qMutID <- as.numeric(sapply(str_split(ClusterID_NumberMutation_AllChr1q6q[, grepl(paste0(EachSampleID,"$"), colnames(ClusterID_NumberMutation_AllChr1q6q)) ] , pattern="_"), '[',1)); print(CountChr6qMutID)
+                              ## Remove NA
+                              CountChr6qMutID <- CountChr6qMutID[!is.na(CountChr6qMutID)]
+                              
+                              Max_CountChr6qMutID <- max(CountChr6qMutID); print(Max_CountChr6qMutID) # 416
+                              if(Max_CountChr6qMutID==0)  {
+                                      # print("Max_CountChr6qMutID is zero. Something is wrong") 
+                                      # break; 
+                              }
+                  
+                              ### Find total count MutID in the clone 
+                              CountChr6q_TotalMutID <- grep(Max_CountChr6qMutID, ClusterID_NumberMutation_AllChr1q6q[, grepl(paste0(EachSampleID,"$"), colnames(ClusterID_NumberMutation_AllChr1q6q)) ], value=TRUE ); print(CountChr6q_TotalMutID) 
+                                      # [1] 01-190: "416_13801"  # WM30 "499_24735"
+                              
+                              if (length(CountChr6q_TotalMutID)==1) { 
+                                      TotalCountMutID <- as.numeric(sapply(str_split(CountChr6q_TotalMutID , pattern="_"), '[',2)); print(TotalCountMutID) # 13801 # WM30: 24735
+                              } else { 
+                                      TotalCountMutID <- as.numeric(sapply(str_split(CountChr6q_TotalMutID , pattern="_"), '[',2))[1]; print(TotalCountMutID) # WM33: 8524
+                              }
+                              ColumnName_BySmpID <- paste0("Chr6qMutCount_TotalCount_",EachSampleID ); print(ColumnName_BySmpID) # "Chr6qMutCount_TotalCount__01-190"
+                              
+                              ############# # +++++++ Add "Chr1qGain" or  "Chr6qLoss" on the node ++++++ ################# #
+                              ## Find row index of the clone that has Chr6q Loos in TreeDataFrame_Proc
+                              RowIndex_From <- grep(TotalCountMutID, TreeDataFrame_Proc$from); print(RowIndex_From) # 3  ## WM30 can't pass this line. 
+                              RowIndex_To <- grep(TotalCountMutID, TreeDataFrame_Proc$to); print(RowIndex_To) # 2
+                              
+                              # One clone: WM30, WM8, WM84, WM86, WM87, WM89
+                              # Two clones: WM43,WM29
+                              if( (is.integer(RowIndex_From) && length(RowIndex_From) == 0) && (is.integer(RowIndex_To) && length(RowIndex_To) == 0) )  {
+                                    if (EachSampleID %in% c("WM30", "WM8", "WM84", "WM86", "WM87", "WM89")) {  ###  Chr6q Loss
+                                              CloneNumb_ByMaxChr6qTotalCountMutID <- "Clone1"
+                                              
+                                              RowIndex_From <- grep(CloneNumb_ByMaxChr6qTotalCountMutID, TreeDataFrame_Proc$from); print(RowIndex_From) # 2
+                                              RowIndex_To <- grep(CloneNumb_ByMaxChr6qTotalCountMutID, TreeDataFrame_Proc$to); print(RowIndex_To) #1
+                                              
+                                              if(ChrNumbArm == "Chr1qGain") { 
+                                                      TreeDataFrame_Proc$to[RowIndex_To]<- gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_Chr1qGain",Max_CountChr6qMutID),  TreeDataFrame_Proc$to[RowIndex_To])
+                                              } else if (ChrNumbArm == "Chr6qLoss") {
+                                                      TreeDataFrame_Proc$from[RowIndex_From]<- gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_Chr6qLoss",Max_CountChr6qMutID),  TreeDataFrame_Proc$from[RowIndex_From])
+                                                      TreeDataFrame_Proc$to[RowIndex_To]<- gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_Chr6qLoss",Max_CountChr6qMutID),  TreeDataFrame_Proc$to[RowIndex_To])
+                                              }
+                                              # RowIndex_Name <- grep(CloneNumb_ByMaxChr6qTotalCountMutID, NumbMutData_Proc$CloneName); print(RowIndex_Name) # 2  ## I don't need this here.  In line 777, there is the same code. 
+                                              # NumbMutData_Proc$CloneName[RowIndex_Name] <- gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_Chr6qLoss",Max_CountChr6qMutID),  NumbMutData_Proc$CloneName[RowIndex_Name])
+                                    } else if( EachSampleID %in% c("WM8","WM27","WM29", "WM43","WM72") ) {    ###  Chr1q Gain. One or Two clones When the count of mutation IDs is different. 
+                                              # # Function to count digits in an integer
+                                              count_digits <- function(num) {
+                                                    # if (!is.numeric(num) || length(num) != 1) {
+                                                    #     stop("Input must be a single numeric value.")
+                                                    # }
+                                                    nchar(as.character(abs(floor(num))))  # Remove sign and decimals
+                                              }
+                                              Digit_TotalCountMutIDFacets <- count_digits(num=as.numeric(TotalCountMutID)); print(Digit_TotalCountMutIDFacets) # 5 
+                                      
+                                              if(EachSampleID %in% c("WM43", "WM29") ) {      ### <<<<<<<======== clone size 2
+                                                  ## at "TreeDataFrame_Proc$from", cehck the digit of CountMutID
+                                                  CoutMutID_TreeDataFrameProc <- sapply(str_split(TreeDataFrame_Proc$from, pattern="_"), "[", 2)
+                                                  Digit_CoutMutID_TreeDataFrameProc <- count_digits(num=as.numeric(CoutMutID_TreeDataFrameProc))
+                                                  
+                                                  ## Find which CountMutID in "TreeDataFrame_Proc$from" has the same digit as Digit_TotalCountMutIDFacets
+                                                  RowIndex_From <- grep(Digit_TotalCountMutIDFacets, Digit_CoutMutID_TreeDataFrameProc); print(RowIndex_From) ##  2 
+                                                  
+                                                  ### Find clone# 
+                                                  CloneNumb_ByMaxChr6qTotalCountMutID <- gsub("_(.*)", "", grep( CoutMutID_TreeDataFrameProc[RowIndex_From], TreeDataFrame_Proc$from, value=TRUE)); print(CloneNumb_ByMaxChr6qTotalCountMutID) # "Clone1" 
+                                                  
+                                                  ### Using Clone#, let's find the RowIndex_To 
+                                                  RowIndex_To <- grep(CloneNumb_ByMaxChr6qTotalCountMutID, TreeDataFrame_Proc$to); print(RowIndex_From) ##  1
+                                                  
+                                                  ## Replce "Clone1" with "Clone1_Chr6qLoss416"
+                                                  TreeDataFrame_Proc$from[RowIndex_From] <-gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_", ChrNumbArm, Max_CountChr6qMutID),  TreeDataFrame_Proc$from[RowIndex_From])
+                                                  TreeDataFrame_Proc$to[RowIndex_To] <- gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_", ChrNumbArm,Max_CountChr6qMutID),  TreeDataFrame_Proc$to[RowIndex_To])
+                                                  
+                                             } else if(EachSampleID %in% c("WM8","WM27", "WM49","WM72")) {        ### <<<<<<<======== clone size 1
+                                                  ## at "TreeDataFrame_Proc$to", cehck the digit of CountMutID
+                                                  CoutMutID_TreeDataToProc <- sapply(str_split(TreeDataFrame_Proc$to, pattern="_"), "[", 2)
+                                                  Digit_CoutMutID_TreeDataToProc <- count_digits(num=as.numeric(CoutMutID_TreeDataToProc))
+                                                  # 
+                                                  # ## Find which CountMutID in "TreeDataFrame_Proc$from" has the same digit as Digit_TotalCountMutIDFacets
+                                                  RowIndex_To <- grep(Digit_TotalCountMutIDFacets, Digit_CoutMutID_TreeDataToProc); print(RowIndex_To) ##  2 
+                                                  CloneNumb_ByMaxChr6qTotalCountMutID <- gsub("_(.*)", "", grep(CoutMutID_TreeDataToProc, TreeDataFrame_Proc$to, value=TRUE)); print(CloneNumb_ByMaxChr6qTotalCountMutID) # "Clone1" 
+                                                  
+                                                  TreeDataFrame_Proc$to[RowIndex_To] <- gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_", ChrNumbArm,Max_CountChr6qMutID),  TreeDataFrame_Proc$to[RowIndex_To])
+                                              }
+                                    }
+                              } else if (length(RowIndex_From)+length(RowIndex_To) >=1  )  {
+                                        if(length(RowIndex_From)==1 | length(RowIndex_To)==0) {
+                                              CloneNumb_ByMaxChr6qTotalCountMutID <- gsub("_(.*)", "", grep( TotalCountMutID, TreeDataFrame_Proc$from, value=TRUE)); print(CloneNumb_ByMaxChr6qTotalCountMutID) # "Clone2" 
+                                        }  
+                                        if (length(RowIndex_From)==0 | length(RowIndex_To)==1) {
+                                              CloneNumb_ByMaxChr6qTotalCountMutID <- gsub("_(.*)", "", grep( TotalCountMutID, TreeDataFrame_Proc$to, value=TRUE)); print(CloneNumb_ByMaxChr6qTotalCountMutID) # "Clone2" 
+                                        }
+                                        ## Replce "Clone2" with "Clone2_Chr6qLoss416"
+                                        TreeDataFrame_Proc$from[RowIndex_From]<-gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_", ChrNumbArm, Max_CountChr6qMutID),  TreeDataFrame_Proc$from[RowIndex_From])
+                                        TreeDataFrame_Proc$to[RowIndex_To]<- gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_", ChrNumbArm, Max_CountChr6qMutID),  TreeDataFrame_Proc$to[RowIndex_To])
+                              }
+                              
+                              ## Find row index of the clone that has Chr6q Loos in NumbMutData_Proc
+                              RowIndex_Name <- grep(CloneNumb_ByMaxChr6qTotalCountMutID, NumbMutData_Proc$CloneName); print(RowIndex_Name) # 3
+                              NumbMutData_Proc$CloneName[RowIndex_Name] <- gsub(CloneNumb_ByMaxChr6qTotalCountMutID, paste0(CloneNumb_ByMaxChr6qTotalCountMutID,"_", ChrNumbArm,Max_CountChr6qMutID),  NumbMutData_Proc$CloneName[RowIndex_Name])    
+                              print(paste0("second made for ", EachSampleID ,": ",  NumbMutData_Proc$CloneName[3] ))
+                    } 
+                    ################################### #################################### ############################ ############################ ############################ ############################ 
+                    ################################### #################################### ############################ ############################ ############################ ############################ 
+                    if(nrow(MeanCCFClusterID_Subset) ==1) {
+                          # TreeDataFrame[2,2] <- "Clone1"
+                          # TreeDataFrame[2,3] <- "FAKE"
+                          # NumbMutData[3,] <- c(EachSampleID, "FAKE", 1000);
+                          # NumbMutData <- data.frame(NumbMutData) %>% dplyr::mutate(MeanCCF = as.numeric(MeanCCF))
+            
+                          # TreeDataFrame_Proc[2,] <- c(EachSampleID, TreeDataFrame_Proc[1,3], "FAKE")
+                          # 
+                          # NumbMutData_Proc[3, ] <- c(EachSampleID, "FAKE", 1000);
+                          # NumbMutData_Proc <- data.frame(NumbMutData_Proc) %>% dplyr::mutate(MeanCCF = as.numeric(MeanCCF))
+                    }
+        
+                    # OutFileName=glue("PhylogeneticTreeOut_", {EachSampleID}, ".pdf")  # paste0("PhylogeneticTreeOut_", EachSampleID, ".pdf" )
+                    # PhylogeneticTree(df=TreeDataFrame, NumbMutData_Proc=NumbMutData, MySampleID=gsub("-", "_", EachSampleID), NodeColor="Color") #### I don't use this. 
+                    PhylogeneticTree(NumbMutData_Proc=NumbMutData_Proc, MySampleID=gsub("-", "_", EachSampleID), NodeColor="Color", ChrNumbArm)  #### <<<<----- I closed this temporarily
+            #  }
+        }
+} # end of function      
+
+
+```
+
+## Step6. Run Func_PairtreePhylogenicTree()
+
+```{r}
+AllSampleID <- unique(mean_ccf_per_cluster_DF$SampleID);print(AllSampleID[1:5]); length(AllSampleID)# gsub("-","_",  unique(mean_ccf_per_cluster_DF$SampleID)); length(AllSampleID) # 47
+# [1] "01-076" "01-115" "01-131" "01-163" "01-190" "04-006" "WM22"   "WM26"   "WM27"   "WM29"           "WM30"   "WM31"   "WM32"   "WM33"   "WM37"   "WM42"   "WM43"   "WM46"   "WM47"   "WM48"  
+# [21] "WM49"   "WM52"   "WM54"   "WM65"   "WM66"   "WM67"   "WM68"   "WM69"   "WM70"   "WM72"          "WM73"   "WM74"   "WM77"   "WM8"    "WM80"   "WM82"   "WM83"   "WM84"   "WM85"   "WM86"  
+# [41] "WM87"   "WM89"   "WM9"    "WM90"   "WM95"   "WM96"   "WM97" 
+
+# Chr1qGainSampleID <- c("WM31","WM33",   "WM8","WM22","WM26","WM27","WM29","WM30","WM32","WM43","WM49","WM68","WM72",    "WM86","WM87","WM90" ) ; length(Chr1qGainSampleID) # 16
+# Chr6qLossSampleID <- c("01-190","WM33","WM70",   "WM8","WM22","WM30","WM32","WM37","WM42","WM43","WM48","WM66","WM68","WM69","WM73",    "WM82","WM84","WM86","WM89","WM96") ; length(Chr6qLossSampleID) # 20 
+
+Chr1qGainSampleID <- c("WM8", "WM86")
+Chr6qLossSampleID <- c("01-190")
+
+intersect(Chr1qGainSampleID, Chr6qLossSampleID) #  "WM33" "WM8"  "WM22" "WM30" "WM32" "WM43" "WM68" "WM86"  total 8 samples
+
+AllOtherSmpID <- AllSampleID[!AllSampleID %in% c(Chr1qGainSampleID, Chr6qLossSampleID)]; length(AllOtherSmpID) # 19 
+
+####### I should set "ChrNumbArm" before running for loop  
+# # Chr1q6qNote <- "No"
+# Chr1q6qNote <-"Yes";  
+# # ChrNumbArm <- "Chr1qGain"; ClusterID_NumberMutation_AllChr1q6q <- ClusterID_NumberMutation_AllChr1q
+# ChrNumbArm <-"Chr6qLoss";  ClusterID_NumberMutation_AllChr1q6q <- ClusterID_NumberMutation_AllChr6q
+
+## 1) Chr1q Gain 
+Func_PairtreePhylogenicTree(GroupSampleID=Chr1qGainSampleID , Chr1q6qNote <-"Yes",  ClusterID_NumberMutation_AllChr1q6q=ClusterID_NumberMutation_AllChr1q, ChrNumbArm="Chr1qGain")
+## 2) Chr6q Loss 
+Func_PairtreePhylogenicTree(GroupSampleID=Chr6qLossSampleID , Chr1q6qNote <-"Yes",  ClusterID_NumberMutation_AllChr1q6q=ClusterID_NumberMutation_AllChr6q, ChrNumbArm="Chr6qLoss")
+## 1) other 19 samples  
+Func_PairtreePhylogenicTree(GroupSampleID=AllOtherSmpID , Chr1q6qNote <-"No",  ClusterID_NumberMutation_AllChr1q6q=ClusterID_NumberMutation_AllChr1q, ChrNumbArm="")
+
+
+```
+
+
+
+
+
+

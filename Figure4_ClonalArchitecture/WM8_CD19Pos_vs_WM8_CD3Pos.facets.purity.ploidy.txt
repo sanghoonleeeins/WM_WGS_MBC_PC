@@ -1,0 +1,2 @@
+	purity	ploidy	dipLogR	loglik	
+WM8_CD19Pos_vs_WM8_CD3Pos.facets.snp_pileup	0.3173135	2.070046	-0.01594471	-546.2622

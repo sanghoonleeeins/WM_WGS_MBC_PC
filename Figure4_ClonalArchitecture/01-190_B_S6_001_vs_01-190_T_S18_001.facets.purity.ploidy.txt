@@ -1,0 +1,2 @@
+	purity	ploidy	dipLogR	loglik	
+01-190_B_S6_001_vs_01-190_T_S18_001.facets.snp_pileup	0.8955103	1.941692	0.03816581	247.7929

@@ -1,0 +1,2 @@
+	purity	ploidy	dipLogR	loglik	
+WM86_T_vs_WM86_N.facets.snp_pileup	NA	2	5.284962e-05
